@@ -62,3 +62,7 @@ export async function deleteForEndpoints(conn, type, ids) {
   const [result] = await conn.query('DELETE FROM record_links WHERE (from_type = ? AND from_id IN (?)) OR (to_type = ? AND to_id IN (?))', [type, ids, type, ids]);
   return result.affectedRows;
 }
+
+export async function setReview(conn, id, { status, reviewedBy }) {
+  await conn.execute('UPDATE record_links SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?', [status, reviewedBy, id]);
+}

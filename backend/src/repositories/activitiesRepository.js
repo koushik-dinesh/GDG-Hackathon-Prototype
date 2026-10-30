@@ -71,3 +71,56 @@ export async function listForRecord(recordId, conn = pool) {
   const [rows] = await conn.query('SELECT * FROM activities WHERE external_record_id = ? ORDER BY occurred_at, id', [recordId]);
   return rows.map(toActivity);
 }
+
+// ---- Read side (API) -------------------------------------------------------------------------
+const READ_SELECT = `
+  SELECT a.id, a.provider, a.activity_type, a.external_record_id, a.project_id, a.occurred_at, a.summary, a.details, a.origin,
+         i.id AS actor_identity_id, i.login AS actor_login, i.display_name AS actor_display_name, i.user_id AS actor_user_id,
+         r.record_type, r.external_key, r.title AS record_title, r.url AS record_url
+  FROM activities a
+  LEFT JOIN external_identities i ON i.id = a.actor_identity_id
+  LEFT JOIN external_records r ON r.id = a.external_record_id`;
+
+export const toActivityView = (row) => ({
+  id: row.id,
+  provider: row.provider,
+  activityType: row.activity_type,
+  occurredAt: row.occurred_at,
+  summary: row.summary,
+  details: parseJson(row.details),
+  origin: row.origin,
+  projectId: row.project_id,
+  actor: row.actor_identity_id
+    ? { identityId: row.actor_identity_id, login: row.actor_login, displayName: row.actor_display_name, userId: row.actor_user_id }
+    : null,
+  record: row.external_record_id
+    ? { id: row.external_record_id, recordType: row.record_type, externalKey: row.external_key, title: row.record_title, url: row.record_url }
+    : null,
+});
+
+/**
+ * Timeline, newest first. projectId: number | null (no project; admins) | undefined (all).
+ * before: { occurredAt: Date, id }. Returns limit+1 rows.
+ */
+export async function listForRead({ projectId, recordId, before, limit }) {
+  const where = [];
+  const params = [];
+  if (projectId === null) where.push('a.project_id IS NULL');
+  else if (projectId !== undefined) {
+    where.push('a.project_id = ?');
+    params.push(projectId);
+  }
+  if (recordId) {
+    where.push('a.external_record_id = ?');
+    params.push(recordId);
+  }
+  if (before) {
+    where.push('(a.occurred_at < ? OR (a.occurred_at = ? AND a.id < ?))');
+    params.push(before.occurredAt, before.occurredAt, before.id);
+  }
+  const [rows] = await pool.query(
+    `${READ_SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY a.occurred_at DESC, a.id DESC LIMIT ?`,
+    [...params, limit + 1],
+  );
+  return rows.map(toActivityView);
+}

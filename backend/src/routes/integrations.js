@@ -43,6 +43,11 @@ const deliveriesQuery = z
   })
   .strict();
 
+const identitiesQuery = z
+  .object({ provider: provider.optional(), unmatched: z.enum(['true', 'false']).default('false').transform((v) => v === 'true') })
+  .strict();
+const identityMatchSchema = z.object({ userId: optionalNullable(id).transform((v) => v ?? null) }).strict();
+
 // Mounted at /integrations behind requireAuth + requireRole('admin').
 export const integrationsRouter = Router();
 
@@ -52,6 +57,9 @@ integrationsRouter.post('/:provider/connect', validate({ params: providerParams 
 integrationsRouter.post('/:provider/callback', validate({ params: providerParams, body: callbackSchema }), ctrl.completeConnect);
 
 integrationsRouter.post('/webhook-deliveries/:id/replay', validate({ params: idParams }), ctrl.replayDelivery);
+// People in connected applications, matched to WorkAgent users (before '/:id', which would capture them).
+integrationsRouter.get('/identities', validate({ query: identitiesQuery }), ctrl.listIdentities);
+integrationsRouter.patch('/identities/:id', validate({ params: idParams, body: identityMatchSchema }), ctrl.matchIdentity);
 integrationsRouter.get('/:id', validate({ params: idParams }), ctrl.get);
 integrationsRouter.patch('/:id', validate({ params: idParams, body: updateSchema }), ctrl.update);
 integrationsRouter.post('/:id/sync', validate({ params: idParams }), ctrl.syncNow);

@@ -66,3 +66,28 @@ export async function setAutoMatch(conn, id, { userId, method }) {
   );
   return result.affectedRows === 1;
 }
+
+export async function list({ provider, unmatched = false, limit = 200 } = {}) {
+  const where = [];
+  const params = [];
+  if (provider) {
+    where.push('provider = ?');
+    params.push(provider);
+  }
+  if (unmatched) where.push('user_id IS NULL AND is_bot = FALSE');
+  const [rows] = await pool.query(
+    `SELECT * FROM external_identities ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY user_id IS NOT NULL, login, id LIMIT ?`,
+    [...params, limit],
+  );
+  return rows.map(toIdentity);
+}
+
+/** A person's choice: match to a user (manual) or clear the match (none). */
+export async function setManualMatch(conn, id, { userId, matchedBy }) {
+  await conn.execute('UPDATE external_identities SET user_id = ?, match_method = ?, matched_by = ? WHERE id = ?', [
+    userId,
+    userId ? 'manual' : 'none',
+    matchedBy,
+    id,
+  ]);
+}
