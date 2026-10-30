@@ -7,7 +7,11 @@ Why not "Phase 3" as originally written: a connector's normalized output has now
 
 ---
 
-## Step 0 — Phase 2.5 closeout (prerequisite, small)
+## Step 0 — Phase 2.5 closeout — DONE (2026-10-30)
+
+Results: committed on `phase-2-work-management`; dev DB backed up and migrated to 004; all three role flows browser-verified; review-screen project selector and employee project display shipped with tests (frontend 78/78). Item 6 is still open: password reset (now / Phase 11). Item 7: `:4100` is another project's server, so it was left alone. Details are at the top of `WORKAGENT_CURRENT_STATE.md`.
+
+**The next phase is now Phase 3A** (below). It is waiting on the human decisions at the end of this file (GitHub auth mode, webhook reachability, encryption key handling).
 
 | # | Task | Done when |
 |---|---|---|

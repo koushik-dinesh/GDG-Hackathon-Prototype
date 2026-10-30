@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { approveActionItem, rejectActionItem, reopenActionItem, updateActionItem } from '../../api/actionItems.js';
+import { approveActionItem, rejectActionItem, reopenActionItem, setActionItemProject, updateActionItem } from '../../api/actionItems.js';
 import { formatDate, formatTimestamp } from '../../utils/format.js';
+import { ProjectSelect } from '../ProjectSelect.jsx';
 import { Button, ErrorAlert, inputClass } from '../ui.jsx';
 import { ActionItemForm } from './ActionItemForm.jsx';
 
@@ -16,7 +17,7 @@ const INFO_FLAGS = ['missing_deadline', 'merged_duplicates']; // mirrors backend
  * One action item. All changes go through the API; the card shows the server's response
  * (no optimistic status changes). `busy` blocks repeated clicks while a request is running.
  */
-export function ActionItemCard({ item, users, flagDescriptions, editable, onChange, onShowEvidence }) {
+export function ActionItemCard({ item, users, projects, flagDescriptions, editable, onChange, onShowEvidence }) {
   const [mode, setMode] = useState('view'); // view | edit | reject
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -100,6 +101,24 @@ export function ActionItemCard({ item, users, flagDescriptions, editable, onChan
                 <dd className="mt-0.5">
                   {item.dueDate ? <span className="text-slate-900">{formatDate(item.dueDate)}</span> : <span className="text-slate-500">No date set</span>}
                   {item.dueDateRaw && <span className="block text-xs text-slate-500">Said: “{item.dueDateRaw}”</span>}
+                </dd>
+              </div>
+              {/* The project can change in any review state: it doesn't alter the reviewed task. */}
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  <label htmlFor={`item-project-${item.id}`}>Project</label>
+                </dt>
+                <dd className="mt-0.5 sm:max-w-xs">
+                  <ProjectSelect
+                    id={`item-project-${item.id}`}
+                    value={item.projectId}
+                    current={item.project}
+                    projects={projects}
+                    disabled={busy}
+                    onChange={(projectId) =>
+                      run(() => setActionItemProject(item.id, projectId), projectId ? 'Project updated.' : 'Project removed.')
+                    }
+                  />
                 </dd>
               </div>
             </dl>

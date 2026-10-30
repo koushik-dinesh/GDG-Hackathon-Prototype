@@ -83,6 +83,10 @@ export function TaskDetail() {
                 {task.meeting.scheduledAt && <span className="block text-xs text-slate-500">{formatDateTime(task.meeting.scheduledAt)}</span>}
               </dd>
             </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Project</dt>
+              <dd className="mt-1 break-words text-slate-900">{task.project ? task.project.name : <span className="text-slate-500">None</span>}</dd>
+            </div>
           </dl>
           <div className="border-t border-slate-100 pt-4">
             <TaskStatusControl task={task} onUpdated={handleUpdated} />

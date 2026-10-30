@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as itemsApi from '../../api/actionItems.js';
 import * as meetingsApi from '../../api/meetings.js';
+import * as projectsApi from '../../api/projects.js';
 import { extractionState } from '../../components/review/ExtractionPanel.jsx';
 import { MeetingDetailPage } from './MeetingDetail.jsx';
 import { ReviewActionItems } from './ReviewActionItems.jsx';
@@ -13,6 +14,14 @@ vi.mock('../../api/actionItems.js');
 // The meeting page also renders the bot panel; keep it offline.
 vi.mock('../../api/bot.js', () => ({
   getBot: vi.fn(async () => ({ bot: { configured: false, meetingStatus: 'review_pending', linkValid: true, canRequest: false, bot: null, polling: null, transcript: null } })),
+}));
+vi.mock('../../api/projects.js', () => ({
+  listProjects: vi.fn(async () => ({
+    projects: [
+      { id: 1, name: 'Payments' },
+      { id: 2, name: 'Mobile app' },
+    ],
+  })),
 }));
 vi.mock('../../api/users.js', () => ({
   listUsers: vi.fn(async () => ({
@@ -270,6 +279,22 @@ describe('reviewing items', () => {
     await screen.findByRole('article', { name: 'Book the venue' });
     expect(screen.queryByRole('button', { name: /Approve|Edit|Reject|Reopen|Add action item|Finish review/ })).toBeNull();
     expect(screen.getByText(/Review finished/)).toBeTruthy();
+  });
+
+  it('moves an item to another project in any review state, loading projects once', async () => {
+    const items = [aiItem({ reviewStatus: 'approved', flags: [], projectId: 1, project: { id: 1, name: 'Payments' } }), aiItem({ id: 2, title: 'Write notes' })];
+    itemsApi.setActionItemProject.mockResolvedValue({ actionItem: { ...items[0], projectId: 2, project: { id: 2, name: 'Mobile app' } } });
+    const { user } = renderReview(items, meeting({ status: 'approved' }));
+    const card = await screen.findByRole('article', { name: 'Book the venue' });
+    const select = within(card).getByLabelText('Project');
+    await waitFor(() => expect(within(select).getByRole('option', { name: 'Mobile app' })).toBeTruthy());
+    expect(select.value).toBe('1');
+    expect(projectsApi.listProjects).toHaveBeenCalledTimes(1);
+
+    await user.selectOptions(select, '2');
+    expect(itemsApi.setActionItemProject).toHaveBeenCalledWith(1, 2);
+    expect(await screen.findByText('Project updated.')).toBeTruthy();
+    expect(within(screen.getByRole('article', { name: 'Book the venue' })).getByLabelText('Project').value).toBe('2');
   });
 });
 

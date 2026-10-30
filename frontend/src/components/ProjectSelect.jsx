@@ -2,17 +2,21 @@ import { useEffect, useState } from 'react';
 import { listProjects } from '../api/projects.js';
 import { inputClass } from './ui.jsx';
 
-// Optional project for a meeting. Chosen manually by an admin; never guessed. Archived projects
-// can't be picked, but a meeting already in one keeps showing it.
-export function ProjectSelect({ value, current, onChange, disabled, id, ...rest }) {
-  const [projects, setProjects] = useState(null);
+// Optional project for a meeting or action item. Chosen manually by an admin; never guessed.
+// Archived projects can't be picked, but a record already in one keeps showing it.
+// Pass `projects` when a page renders many selects, so the list is loaded once (null = still
+// loading); leave it undefined to let the select load the list itself.
+export function ProjectSelect({ value, current, onChange, disabled, id, projects: provided, ...rest }) {
+  const [loaded, setLoaded] = useState(null);
   const [error, setError] = useState(null);
+  const projects = provided !== undefined ? provided : loaded;
 
   useEffect(() => {
+    if (provided !== undefined) return;
     listProjects()
-      .then((d) => setProjects(d.projects))
+      .then((d) => setLoaded(d.projects))
       .catch(setError);
-  }, []);
+  }, [provided]);
 
   const options = projects ?? [];
   const keepCurrent = current && !options.some((p) => p.id === current.id);

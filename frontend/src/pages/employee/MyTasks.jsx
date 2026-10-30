@@ -163,7 +163,9 @@ function TaskCard({ task, onUpdated }) {
               {task.title}
             </Link>
           </h2>
-          <p className="mt-0.5 break-words text-sm text-slate-500">From “{task.meeting.title}”</p>
+          <p className="mt-0.5 break-words text-sm text-slate-500">
+            From “{task.meeting.title}”{task.project && <> · Project: {task.project.name}</>}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <TaskStatusBadge status={task.taskStatus} />

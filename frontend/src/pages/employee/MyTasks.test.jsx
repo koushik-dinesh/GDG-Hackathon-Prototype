@@ -29,7 +29,7 @@ const task = (o = {}) => ({
 });
 const TASKS = [
   task(),
-  task({ id: 2, title: 'Book the venue', priority: 'high', dueDate: '2026-11-20', taskStatus: 'in_progress', allowedStatuses: ['todo', 'blocked', 'done'], meeting: { id: 10, title: 'Ops weekly', scheduledAt: '2026-11-05T10:00:00Z' } }),
+  task({ id: 2, title: 'Book the venue', project: { id: 3, name: 'Launch' }, priority: 'high', dueDate: '2026-11-20', taskStatus: 'in_progress', allowedStatuses: ['todo', 'blocked', 'done'], meeting: { id: 10, title: 'Ops weekly', scheduledAt: '2026-11-05T10:00:00Z' } }),
   task({ id: 3, title: 'Write notes', priority: 'low', dueDate: '2026-10-01', overdue: true, meeting: { id: 9, title: 'Launch sync', scheduledAt: '2026-11-04T10:00:00Z' } }),
   task({ id: 4, title: 'Old thing', taskStatus: 'done', dueDate: null, allowedStatuses: ['in_progress', 'todo'] }),
 ];
@@ -87,6 +87,7 @@ describe('employee dashboard', () => {
     const late = screen.getByRole('article', { name: 'Write notes' });
     expect(within(late).getByText(/Overdue/)).toBeTruthy();
     expect(within(late).getByText('From “Launch sync”')).toBeTruthy();
+    expect(within(screen.getByRole('article', { name: 'Book the venue' })).getByText('From “Ops weekly” · Project: Launch')).toBeTruthy();
   });
 
   it('shows empty and error states', async () => {
@@ -170,6 +171,7 @@ describe('task detail', () => {
     expect(await screen.findByRole('heading', { name: 'Send the deck' })).toBeTruthy();
     expect(screen.getByText('Said in the meeting: “by Friday”')).toBeTruthy();
     expect(screen.getByText('Launch sync')).toBeTruthy();
+    expect(screen.getByText('None')).toBeTruthy(); // no project
     expect(screen.getByText('“I\'ll send the deck by Friday”')).toBeTruthy();
     expect(screen.getByText(/not a guarantee/)).toBeTruthy();
     expect(screen.getByText('Notification email sent to you')).toBeTruthy();

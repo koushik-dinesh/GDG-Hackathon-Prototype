@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createActionItem, finishReview, getActionItems } from '../../api/meetings.js';
+import { listProjects } from '../../api/projects.js';
 import { listUsers } from '../../api/users.js';
 import { ActionItemCard } from '../../components/review/ActionItemCard.jsx';
 import { ActionItemForm } from '../../components/review/ActionItemForm.jsx';
@@ -23,6 +24,7 @@ export function ReviewActionItems({ meeting, onMeetingChanged, onShowEvidence })
   const [data, setData] = useState(null); // { actionItems, flagDescriptions }
   const [loadError, setLoadError] = useState(null);
   const [users, setUsers] = useState([]);
+  const [projects, setProjects] = useState(null); // null until loaded
   const [notice, setNotice] = useState('');
   const [adding, setAdding] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -43,6 +45,9 @@ export function ReviewActionItems({ meeting, onMeetingChanged, onShowEvidence })
     listUsers({ includeInactive: false })
       .then((d) => setUsers(d.users))
       .catch(() => setUsers([]));
+    listProjects()
+      .then((d) => setProjects(d.projects))
+      .catch(() => setProjects([]));
   }, []);
 
   const editable = REVIEWABLE.includes(meeting.status);
@@ -105,6 +110,7 @@ export function ReviewActionItems({ meeting, onMeetingChanged, onShowEvidence })
                   key={item.id}
                   item={item}
                   users={users}
+                  projects={projects}
                   flagDescriptions={data.flagDescriptions}
                   editable={editable}
                   onChange={replaceItem}

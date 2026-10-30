@@ -1,5 +1,22 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update — Phase 2.5 closeout done (2026-10-30, later the same day).** This supersedes the matching rows below:
+> - Phase 1 and Phase 2 are committed on branch `phase-2-work-management` (`d9c4139`, `60b487e`); 2.5 is committed on top.
+> - The dev DB was backed up to `backups/meeting_action-pre-004-20261030-204126.sql` (gitignored), then migrated to 004. Existing data is intact (11 users, 9 items before verification).
+> - Browser-verified on the real dev stack (API :4000 → dev DB, Vite :5173, Mailpit):
+>   - admin invites a manager → email arrives in Mailpit with no password in it → token is removed from the address bar → activation → manager signs in;
+>   - the manager sees no admin navigation, gets 403 from admin APIs, creates a project, becomes its owner and adds a member;
+>   - an admin moves an approved item into the project from the review screen (new control);
+>   - an admin-created meeting in the project passes its project to a manual item;
+>   - an invited employee sees "Project: …" on My Tasks and on task detail, gets 404 for a project they are not a member of and 403 for meetings;
+>   - logout makes `/auth/me` return 401, and the `user_sessions` rows are marked `logout`;
+>   - the server log contains no tokens.
+> - New UI: a project selector on each review card (works in any review state), and the project shown on the employee task list and detail page.
+> - Tests: frontend **78/78** (1 new test, 2 extended), build OK. No backend code changed in 2.5. The backend count is still 285/285 from the earlier run today.
+> - Correction: the process on `:4100` belongs to a **different project** (`Ekanta-Updated/backend`, under nodemon), not WorkAgent. It was left running. Port 4100 is therefore unusable for WorkAgent's `backend-verify` launch config on this machine.
+> - Verification data left in the dev DB: users `verify-admin@`, `verify-manager@` and `verify-employee@workagent.test`; project "Verification Project 2.5"; meeting 12 with one item; and item 4 ("Prepare the Q4 report") moved into that project. These are safe to deactivate/archive.
+> - Still open: password reset for activated users (decision pending), product rename, manager access to meetings.
+
 Source of this document: direct inspection of the repository working tree, the local databases (read-only queries) and test/build runs on 2026-10-30. Earlier reports (`docs/PROJECT_OVERVIEW.md` §13–§14) were checked against the code, not taken on trust. Detailed design history stays in `docs/PLANNING.md` and `docs/PROJECT_OVERVIEW.md`; this file is the current-state summary.
 
 Labels: **Verified** = exercised by a check run on 2026-10-30. **DB evidence** = rows in the local dev database show it happened before, but it was not re-run today. **Implemented, not verified** = code read, nothing exercised it today. **Reported** = only stated by an earlier session.
