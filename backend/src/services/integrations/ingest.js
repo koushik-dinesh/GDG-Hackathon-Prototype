@@ -8,13 +8,12 @@
 //   arrive in no particular order).
 // - Project: new records take the resource's project; records not set by hand follow the
 //   resource; activities carry their record's project.
-// - Identity matching is automatic only for an exact email or a unique exact alias, and never
+// - Identity matching is automatic only for an exact, provider-verified email, and never
 //   overrides a match made by a person.
 import { createHash } from 'node:crypto';
 import * as activities from '../../repositories/activitiesRepository.js';
 import * as identities from '../../repositories/externalIdentitiesRepository.js';
 import * as records from '../../repositories/externalRecordsRepository.js';
-import { normalizeName } from '../matching/normalize.js';
 import { parseEnvelopes } from './envelopes.js';
 import { createLink } from './links.js';
 
@@ -44,21 +43,13 @@ export function contentHash(r) {
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
-async function autoMatch(conn, identityId, { email, login, displayName }) {
-  if (email) {
-    const [rows] = await conn.query('SELECT id FROM users WHERE email = ? AND is_active = TRUE', [email.toLowerCase()]);
-    if (rows.length === 1) return identities.setAutoMatch(conn, identityId, { userId: rows[0].id, method: 'email' });
-  }
-  for (const name of [login, displayName]) {
-    if (!name) continue;
-    const normalized = normalizeName(name);
-    if (!normalized) continue;
-    const [rows] = await conn.query(
-      'SELECT DISTINCT a.user_id FROM user_aliases a JOIN users u ON u.id = a.user_id WHERE a.normalized_alias = ? AND u.is_active = TRUE',
-      [normalized],
-    );
-    if (rows.length === 1) return identities.setAutoMatch(conn, identityId, { userId: rows[0].user_id, method: 'alias' });
-  }
+// Automatic matching uses only a verified email from the provider's account data (connectors must
+// never pass commit/author emails, which anyone can set). Logins and display names are not
+// matched: an admin maps those people by hand (Phase 3B: name-only matching is unsafe).
+async function autoMatch(conn, identityId, { email }) {
+  if (!email) return false;
+  const [rows] = await conn.query('SELECT id FROM users WHERE email = ? AND is_active = TRUE', [email.toLowerCase()]);
+  if (rows.length === 1) return identities.setAutoMatch(conn, identityId, { userId: rows[0].id, method: 'email' });
   return false;
 }
 

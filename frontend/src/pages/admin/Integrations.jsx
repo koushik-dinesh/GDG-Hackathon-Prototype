@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { listConnections, listProviders, startConnect } from '../../api/integrations.js';
+import { listConnections, listIdentities, listProviders, matchIdentity, startConnect } from '../../api/integrations.js';
+import { listUsers } from '../../api/users.js';
 import { EmptyState } from '../../components/EmptyState.jsx';
-import { Button, Card, ErrorAlert, Loading } from '../../components/ui.jsx';
+import { Button, Card, ErrorAlert, Loading, inputClass } from '../../components/ui.jsx';
 import { formatDateTime } from '../../utils/format.js';
 import { CONNECTION_STATUS, HEALTH } from './integrationLabels.js';
 
@@ -53,9 +54,14 @@ export function IntegrationsPage() {
         <ul className="divide-y divide-slate-100">
           {providers?.map((p) => (
             <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-slate-900">{p.displayName}</p>
                 {!p.available && <p className="text-xs text-amber-700">Not configured on the server: {p.problem}</p>}
+                {p.webhookUrl && (
+                  <p className="break-all text-xs text-slate-500">
+                    Webhook URL: <code className="rounded bg-slate-100 px-1">{p.webhookUrl}</code>
+                  </p>
+                )}
               </div>
               <Button onClick={() => connect(p.id)} disabled={!p.available || Boolean(connecting)}>
                 {connecting === p.id ? 'Opening…' : `Connect ${p.displayName}`}
@@ -89,6 +95,87 @@ export function IntegrationsPage() {
           </ul>
         </Card>
       )}
+      {connections?.length > 0 && <PeopleCard />}
     </div>
+  );
+}
+
+/**
+ * People from connected applications (e.g. GitHub accounts) and the WorkAgent user each one is.
+ * Matching is manual: logins and names are never matched automatically (only a verified email
+ * from the provider is), and a manual choice is never overwritten by a sync.
+ */
+function PeopleCard() {
+  const [identities, setIdentities] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [onlyUnmatched, setOnlyUnmatched] = useState(true);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    listIdentities({ unmatched: onlyUnmatched })
+      .then((d) => setIdentities(d.identities))
+      .catch(setError);
+  }, [onlyUnmatched]);
+  useEffect(() => {
+    listUsers({ includeInactive: false })
+      .then((d) => setUsers(d.users))
+      .catch(() => setUsers([]));
+  }, []);
+
+  async function match(identity, userId) {
+    setError(null);
+    try {
+      const { identity: updated } = await matchIdentity(identity.id, userId);
+      setIdentities((list) => (onlyUnmatched && updated.userId ? list.filter((i) => i.id !== updated.id) : list.map((i) => (i.id === updated.id ? updated : i))));
+      setNotice(updated.userId ? `${identity.login ?? identity.externalUserId} matched.` : `${identity.login ?? identity.externalUserId} unmatched.`);
+    } catch (err) {
+      setError(err);
+    }
+  }
+
+  return (
+    <Card
+      title="People in connected applications"
+      actions={
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input type="checkbox" checked={onlyUnmatched} onChange={(e) => setOnlyUnmatched(e.target.checked)} />
+          Only unmatched
+        </label>
+      }
+    >
+      <p className="mb-3 text-xs text-slate-500">Match accounts to WorkAgent users so their activity is attributed to them. Bots are listed but need no match.</p>
+      <ErrorAlert error={error} />
+      {notice && <p role="status" className="mb-2 text-sm text-emerald-700">{notice}</p>}
+      {!identities && !error && <Loading />}
+      {identities?.length === 0 && <p className="text-sm text-slate-500">{onlyUnmatched ? 'Everyone is matched.' : 'No people synced yet.'}</p>}
+      {identities?.length > 0 && (
+        <ul className="divide-y divide-slate-100">
+          {identities.map((i) => (
+            <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 py-2" aria-label={i.login ?? i.externalUserId}>
+              <div className="text-sm">
+                <span className="font-medium text-slate-900">{i.login ?? i.externalUserId}</span>
+                <span className="text-slate-500"> · {i.provider}</span>
+                {i.isBot && <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">bot</span>}
+                {i.matchMethod !== 'none' && <span className="ml-2 text-xs text-slate-500">matched ({i.matchMethod})</span>}
+              </div>
+              <select
+                aria-label={`WorkAgent user for ${i.login ?? i.externalUserId}`}
+                className={`${inputClass} w-56`}
+                value={i.userId ?? ''}
+                onChange={(e) => match(i, e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Not matched</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

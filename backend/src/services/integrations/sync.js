@@ -123,16 +123,17 @@ export function createSyncEngine({ registry = defaultRegistry, budget: defaultBu
     const totals = { records: 0, activities: 0 };
     let chunks = 0;
     const streams = connector.streams(resource);
-    const done = new Set();
+    // Streams run in the connector's order (parents before children). A run can span several
+    // jobs; streams finished earlier in this run are marked (completed_at) and skipped.
+    const done = new Set((await cursors.listForResource(resource.id)).filter((c) => c.completedAt).map((c) => c.stream));
 
     try {
-      while (done.size < streams.length) {
-        for (const stream of streams) {
-          if (done.has(stream)) continue;
+      for (const stream of streams) {
+        while (!done.has(stream)) {
           const overBudget =
             Date.now() - started >= budget.ms || ctx.httpStats().requests >= budget.requests || chunks >= (budget.chunks ?? MAX_CHUNKS_PER_JOB);
           if (overBudget) {
-            logger.info('integration.sync budget used; continuing later', { resourceId, chunks, ...totals, requests: ctx.httpStats().requests, ms: Date.now() - started });
+            logger.info('integration.sync budget used; continuing later', { resourceId, stream, chunks, ...totals, requests: ctx.httpStats().requests, ms: Date.now() - started });
             throw new RescheduleJob(0, 'sync budget used');
           }
 
@@ -152,7 +153,7 @@ export function createSyncEngine({ registry = defaultRegistry, budget: defaultBu
               .filter((e) => e.type === 'record' && e.sourceUpdatedAt)
               .map((e) => new Date(e.sourceUpdatedAt))
               .reduce((a, b) => (b > a ? b : a), null);
-            await cursors.save(conn, { resourceId: resource.id, stream, phase: nextPhase, cursor: page.cursor ?? null, highWatermark: newest });
+            await cursors.save(conn, { resourceId: resource.id, stream, phase: nextPhase, cursor: page.cursor ?? null, highWatermark: newest, completed: page.done });
             return s;
           });
           totals.records += stats.records.inserted + stats.records.updated;
@@ -175,6 +176,7 @@ export function createSyncEngine({ registry = defaultRegistry, budget: defaultBu
       return { status: 'stopped', chunks, ...totals };
     }
 
+    await cursors.clearCompletion(resource.id);
     await resources.update(pool, resource.id, {
       lastSyncedAt: new Date(),
       nextSyncAt: later(config.integrations.syncIntervalMs),

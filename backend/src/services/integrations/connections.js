@@ -49,7 +49,7 @@ const resourceSchema = z.object({
 export function toAppError(err) {
   if (err instanceof AppError) return err;
   if (err instanceof ProviderError) {
-    const status = err.kind === 'rate_limited' ? 429 : err.kind === 'not_found' ? 404 : 502;
+    const status = { rate_limited: 429, not_found: 404, invalid_request: 400 }[err.kind] ?? 502;
     return new AppError(status, 'PROVIDER_ERROR', err.publicMessage, [{ field: 'provider', message: err.kind }]);
   }
   if (err instanceof CredentialsKeyMissingError) return new AppError(503, 'INTEGRATIONS_NOT_CONFIGURED', 'CREDENTIALS_ENCRYPTION_KEY is not set on the server');

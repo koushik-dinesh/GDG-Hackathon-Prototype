@@ -194,18 +194,18 @@ describe('activities', () => {
 describe('identities', () => {
   const ident = (o) => ({ type: 'identity', ...o });
 
-  it('match automatically only by exact email or a unique alias', async () => {
+  it('match automatically only by exact, provider-verified email (never by name or alias)', async () => {
     const res = await run([
       ident({ externalUserId: 'e1', login: 'ana-g', email: 'ANA@ingest.test' }),
       ident({ externalUserId: 'e2', login: 'RajP' }),
       ident({ externalUserId: 'e3', login: 'sam' }),
       ident({ externalUserId: 'e4', login: 'unknown-person' }),
     ]);
-    assert.equal(res.identities.matched, 2);
+    assert.equal(res.identities.matched, 1);
     const get = (externalUserId) => identities.findBySource(pool, { provider: 'fake', sourceInstance: 'fake.test', externalUserId });
     assert.deepEqual([(await get('e1')).userId, (await get('e1')).matchMethod], [ids.ana, 'email']);
-    assert.deepEqual([(await get('e2')).userId, (await get('e2')).matchMethod], [ids.raj, 'alias']);
-    assert.equal((await get('e3')).userId, null, 'ambiguous alias');
+    assert.equal((await get('e2')).userId, null, 'a login equal to an alias is not enough (name-only matching is unsafe)');
+    assert.equal((await get('e3')).userId, null);
     assert.equal((await get('e4')).userId, null);
   });
 

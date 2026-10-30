@@ -1,5 +1,5 @@
-import { randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { createPrivateKey, randomBytes } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
@@ -115,6 +115,24 @@ const schema = z.object({
   WEBHOOK_MAX_BYTES: z.coerce.number().int().min(1024).max(25 * 1024 * 1024).default(10 * 1024 * 1024),
   // Webhook payloads are kept this many days (for retries and replay), then deleted.
   WEBHOOK_PAYLOAD_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
+  // Public base URL providers send webhooks to (shown to admins), e.g. https://workagent-dev.example.com
+  PUBLIC_WEBHOOK_BASE_URL: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^https?:\/\/[^\s/]+(\/[^\s]*)?$/i.test(v), 'Must be an http(s) URL'),
+
+  // GitHub App (Phase 3B). Unset GITHUB_APP_ID = GitHub integration unavailable.
+  GITHUB_APP_ID: z.string().regex(/^\d+$/, 'The numeric App ID from the GitHub App settings').optional(),
+  GITHUB_APP_SLUG: z.string().regex(/^[a-z0-9][a-z0-9-]{0,99}$/i, 'The App’s URL name (github.com/apps/<slug>)').optional(),
+  // PEM text (newlines may be written as \n) or a path to the .pem file; one of the two.
+  GITHUB_APP_PRIVATE_KEY: z.string().optional(),
+  GITHUB_APP_PRIVATE_KEY_PATH: z.string().optional(),
+  GITHUB_WEBHOOK_SECRET: z.string().min(20, 'Use a long random webhook secret (openssl rand -hex 32)').optional(),
+  // Accepted as well during webhook secret rotation.
+  GITHUB_WEBHOOK_SECRET_PREVIOUS: z.string().min(20).optional(),
+  // Only for GitHub Enterprise Server; github.com needs no change. Must be https.
+  GITHUB_API_URL: z.string().url().default('https://api.github.com'),
+  GITHUB_WEB_URL: z.string().url().default('https://github.com'),
 
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
@@ -159,6 +177,45 @@ const encryptionKeys = isTest
 
 if (encryptionKeys.previous?.equals(encryptionKeys.current)) {
   console.error('CREDENTIALS_ENCRYPTION_KEY_PREVIOUS must differ from CREDENTIALS_ENCRYPTION_KEY.');
+  process.exit(1);
+}
+
+// GitHub App private key: PEM text (\n allowed) or a file. Validated here so a bad key fails at
+// startup; error messages never include the key.
+function loadGithubPrivateKey() {
+  if (isTest) return undefined;
+  if (env.GITHUB_APP_PRIVATE_KEY && env.GITHUB_APP_PRIVATE_KEY_PATH) {
+    console.error('Set GITHUB_APP_PRIVATE_KEY or GITHUB_APP_PRIVATE_KEY_PATH, not both.');
+    process.exit(1);
+  }
+  let pem;
+  if (env.GITHUB_APP_PRIVATE_KEY_PATH) {
+    try {
+      pem = readFileSync(env.GITHUB_APP_PRIVATE_KEY_PATH, 'utf8');
+    } catch {
+      console.error('GITHUB_APP_PRIVATE_KEY_PATH cannot be read.');
+      process.exit(1);
+    }
+  } else if (env.GITHUB_APP_PRIVATE_KEY) {
+    pem = env.GITHUB_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
+  } else {
+    return undefined;
+  }
+  try {
+    const key = createPrivateKey(pem);
+    if (key.asymmetricKeyType !== 'rsa') throw new Error('not RSA');
+  } catch {
+    console.error('The GitHub App private key is not a valid RSA private key (PEM). Download a new one from the App settings.');
+    process.exit(1);
+  }
+  return pem;
+}
+const githubPrivateKey = loadGithubPrivateKey();
+if (!isTest && env.GITHUB_APP_ID && (!githubPrivateKey || !env.GITHUB_APP_SLUG || !env.GITHUB_WEBHOOK_SECRET)) {
+  console.warn('GITHUB_APP_ID is set but GITHUB_APP_SLUG, the private key or GITHUB_WEBHOOK_SECRET is missing; GitHub stays unavailable.');
+}
+if (isProd && (!env.GITHUB_API_URL.startsWith('https://') || !env.GITHUB_WEB_URL.startsWith('https://'))) {
+  console.error('GITHUB_API_URL and GITHUB_WEB_URL must be https in production.');
   process.exit(1);
 }
 
@@ -238,7 +295,19 @@ export const config = {
     rateLimitReserve: env.INTEGRATION_RATE_LIMIT_RESERVE,
     webhookMaxBytes: env.WEBHOOK_MAX_BYTES,
     webhookRetentionDays: env.WEBHOOK_PAYLOAD_RETENTION_DAYS,
+    publicWebhookBaseUrl: env.PUBLIC_WEBHOOK_BASE_URL ? env.PUBLIC_WEBHOOK_BASE_URL.replace(/\/+$/, '') : undefined,
   },
+  // GitHub App (Phase 3B). Tests never see real values: they configure a fake GitHub explicitly.
+  github: isTest
+    ? { appId: undefined, slug: undefined, privateKey: undefined, webhookSecrets: [], apiUrl: env.GITHUB_API_URL, webUrl: env.GITHUB_WEB_URL }
+    : {
+        appId: env.GITHUB_APP_ID,
+        slug: env.GITHUB_APP_SLUG,
+        privateKey: githubPrivateKey,
+        webhookSecrets: [env.GITHUB_WEBHOOK_SECRET, env.GITHUB_WEBHOOK_SECRET_PREVIOUS].filter(Boolean),
+        apiUrl: env.GITHUB_API_URL.replace(/\/+$/, ''),
+        webUrl: env.GITHUB_WEB_URL.replace(/\/+$/, ''),
+      },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
     maxAttempts: env.JOB_MAX_ATTEMPTS,

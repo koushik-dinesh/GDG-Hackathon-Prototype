@@ -1,5 +1,29 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 3B GitHub App integration implemented (2026-10-30). Live GitHub has NOT been verified yet.**
+> - **Connector:** `services/integrations/providers/github/` implements the Phase 3A contract: settings, App JWT and installation tokens, mappers, sync streams, webhooks. No GitHub-specific tables.
+> - **Auth:**
+>   - RS256 App JWT (9 min, cached);
+>   - installation tokens (1 h) stored encrypted in the vault, renewed before expiry and after a 401;
+>   - each installation verified through the App before connecting;
+>   - suspended/unapproved/foreign installations refused with clear messages.
+> - **Data:** repositories (metadata in resources, plus a repository record), issues, pull requests, reviews, issue/PR comments, review comments, commits (default branch by sync, every branch by push webhooks). No file contents.
+> - **Sync:** backfill (open items of any age + changes in the window), then incremental from the last watermark. Paginated; resumable after a worker restart; GitHub primary/secondary rate limits pause the connection.
+> - **Webhooks** (`X-Hub-Signature-256`, current and previous secret, foreign-App deliveries refused):
+>   - `installation` (deleted/suspend/unsuspend/new_permissions_accepted), `installation_repositories`, `repository`;
+>   - `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`;
+>   - `push`, `ping`.
+> - **Identities:** GitHub numeric user ids with logins preserved; unregistered people kept unmatched; **no automatic name/login/alias matching** (it was removed from ingest for all providers; only a provider-verified email matches automatically); manual mappings are never overwritten.
+> - **Projects:** repository → project mapping flows to every record and activity; manual record moves stay protected.
+> - **UI:**
+>   - Integrations page: GitHub availability and webhook URL, connect, a people-mapping card.
+>   - Connection page: installation access, permissions, a "Manage repository access on GitHub" link, error/retry hints.
+>   - Project page: **Development** card (open issues/PRs and recent activity, filtered by project permissions).
+> - **Schema:** migration `007_sync_cursor_completion.sql` (additive: `integration_sync_cursors.completed_at`). The sync engine now runs a resource's streams in order (parents first) across jobs. Dev DB migrated to 007 (backup in `backups/`).
+> - **Tests:** backend **456/456** (46 new GitHub tests, including the contract suite against a fake GitHub over HTTP), frontend **91/91**, build OK.
+> - **Browser check:** test DB with a local fake GitHub. Connect → install redirect → setup → repo mapping → sync → signed webhook (duplicate ignored, forged refused) → member sees the project's Development card. No tokens or keys in the logs.
+> - **Blocker for live verification:** a real GitHub App (ID, slug, private key, webhook secret) and the tunnel hostname. Procedure: `docs/runbooks/integrations.md` §8.4.
+
 > **Update: Phase 3A integration framework complete (2026-10-30, after the 2.5 note below).**
 > - **Migrations:** 005 (integration framework) and 006 (work records). The dev DB is at 006, with backups in `backups/`.
 > - **Backend** (`services/integrations/`):

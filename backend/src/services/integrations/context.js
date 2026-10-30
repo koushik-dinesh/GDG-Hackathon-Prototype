@@ -27,6 +27,12 @@ export function buildContext(connector, connection, { resource = null, signal, v
         const found = await vault.get(connection.id, kind, { refresh });
         return found?.value ?? null;
       },
+      /** Replaces the stored credential with a fresh one from the connector (after a 401). */
+      async refresh(kind) {
+        if (!connection.id || !connector.refreshCredentials) return null;
+        const found = await vault.get(connection.id, kind, { refresh: () => connector.refreshCredentials(ctx), force: true });
+        return found?.value ?? null;
+      },
     },
 
     /** An HTTP client for this job; the framework reads its request counts and rate limits. */

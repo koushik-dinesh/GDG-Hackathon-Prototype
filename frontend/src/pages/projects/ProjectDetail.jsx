@@ -12,6 +12,7 @@ import {
 } from '../../api/projects.js';
 import { listTeams } from '../../api/teams.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { DevelopmentCard } from '../../components/DevelopmentCard.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { PRIORITY_STYLE, TaskStatusBadge } from '../../components/tasks/TaskStatus.jsx';
 import { Button, Card, ErrorAlert, Loading, StatusBadge, SuccessAlert, inputClass } from '../../components/ui.jsx';
@@ -140,6 +141,7 @@ export function ProjectDetailPage() {
       />
       <MeetingsCard projectId={project.id} linkToMeetings={user.role === 'admin'} />
       <TasksCard projectId={project.id} />
+      <DevelopmentCard projectId={project.id} />
       <ActivityCard projectId={project.id} refreshKey={activityKey} />
     </div>
   );

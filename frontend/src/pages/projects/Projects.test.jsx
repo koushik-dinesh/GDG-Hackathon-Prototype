@@ -16,6 +16,11 @@ vi.mock('../../api/auth.js');
 vi.mock('../../api/projects.js');
 vi.mock('../../api/directory.js');
 vi.mock('../../api/teams.js');
+// Projects without synced GitHub work: the Development card renders nothing.
+vi.mock('../../api/workRecords.js', () => ({
+  listExternalRecords: vi.fn(async () => ({ records: [], next: null })),
+  listActivities: vi.fn(async () => ({ activities: [], next: null })),
+}));
 
 const USERS = {
   admin: { id: 1, email: 'ada@example.test', fullName: 'Ada Admin', role: 'admin', isActive: true },

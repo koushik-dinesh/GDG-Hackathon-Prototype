@@ -9,6 +9,9 @@ import { IntegrationDetailPage } from './IntegrationDetail.jsx';
 import { IntegrationsPage, redirectTo } from './Integrations.jsx';
 
 vi.mock('../../api/integrations.js');
+vi.mock('../../api/users.js', () => ({
+  listUsers: vi.fn(async () => ({ users: [{ id: 5, fullName: 'Ana Garcia', email: 'ana@example.test' }] })),
+}));
 vi.mock('../../api/projects.js', () => ({
   listProjects: vi.fn(async () => ({ projects: [{ id: 3, name: 'Payments' }, { id: 4, name: 'Mobile' }] })),
 }));
@@ -74,6 +77,7 @@ function renderAt(path) {
 
 beforeEach(() => {
   vi.spyOn(window, 'confirm').mockReturnValue(true);
+  api.listIdentities.mockResolvedValue({ identities: [] });
 });
 afterEach(() => {
   cleanup();

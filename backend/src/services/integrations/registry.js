@@ -5,6 +5,7 @@ import { config } from '../../config/index.js';
 import { assertConnector } from './contract.js';
 import { keyring } from './crypto.js';
 import fake from './providers/fake/index.js';
+import github from './providers/github/index.js';
 
 export function createRegistry(connectors, { keyConfigured = () => keyring.isConfigured() } = {}) {
   const byId = new Map();
@@ -40,6 +41,7 @@ export function createRegistry(connectors, { keyConfigured = () => keyring.isCon
   };
 }
 
-// Real providers are added here as they are built (GitHub in Phase 3B). The fake provider exists
-// for tests and, when INTEGRATIONS_FAKE_PROVIDER=true outside production, for trying the UI.
-export const registry = createRegistry(config.integrations.fakeProvider ? [fake] : []);
+// Real providers are always registered and become available once configured (GitHub: Phase 3B).
+// The fake provider exists for tests and, with INTEGRATIONS_FAKE_PROVIDER=true outside
+// production, for trying the UI.
+export const registry = createRegistry([github, ...(config.integrations.fakeProvider ? [fake] : [])]);

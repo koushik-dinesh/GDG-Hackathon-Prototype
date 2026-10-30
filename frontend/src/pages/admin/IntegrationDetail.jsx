@@ -116,10 +116,13 @@ export function IntegrationDetailPage() {
           <Detail label="Stored credentials">{credentialKinds.length ? credentialKinds.map((k) => k.kind.replaceAll('_', ' ')).join(', ') : 'None'}</Detail>
         </dl>
         {c.lastErrorMessage && (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             Last error: {c.lastErrorMessage}
-          </p>
+            {c.status === 'error' && <span className="block text-xs">Use Connect on the Integrations page to reconnect this account; settings and synced data are kept.</span>}
+            {c.status === 'active' && <span className="block text-xs">Syncing retries automatically; use “Sync now” to retry immediately.</span>}
+          </div>
         )}
+        {c.provider === 'github' && <GithubInstallation connection={c} />}
       </Card>
 
       <Card
@@ -205,6 +208,33 @@ export function IntegrationDetailPage() {
             {busy === 'disconnect' ? 'Disconnecting…' : 'Disconnect'}
           </Button>
         </Card>
+      )}
+    </div>
+  );
+}
+
+const PERMISSION_LABEL = { metadata: 'Metadata', issues: 'Issues', pull_requests: 'Pull requests', contents: 'Contents' };
+
+/** GitHub App installation details: which repositories it may see and where to change that. */
+function GithubInstallation({ connection: c }) {
+  const s = c.settings ?? {};
+  const permissions = Object.entries(s.permissions ?? {});
+  return (
+    <div className="mt-4 rounded-md border border-slate-200 px-4 py-3 text-sm">
+      <p className="font-medium text-slate-900">GitHub App installation</p>
+      <p className="mt-1 text-slate-600">
+        Repository access: {s.repositorySelection === 'all' ? 'all repositories of this account' : 'selected repositories'}. Repositories you
+        grant on GitHub appear below (not synced until you tick “Sync”).
+      </p>
+      {permissions.length > 0 && (
+        <p className="mt-1 text-xs text-slate-500">
+          Permissions: {permissions.map(([k, v]) => `${PERMISSION_LABEL[k] ?? k.replaceAll('_', ' ')} (${v})`).join(', ')}
+        </p>
+      )}
+      {s.manageUrl && (
+        <a href={s.manageUrl} target="_blank" rel="noreferrer noopener" className="mt-2 inline-block text-sm font-medium text-slate-700 underline">
+          Manage repository access on GitHub
+        </a>
       )}
     </div>
   );

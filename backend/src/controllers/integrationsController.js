@@ -1,5 +1,6 @@
 // Admin integration management (Phase 3A). Mounted behind requireAuth + requireRole('admin').
 // Responses use the repositories' whitelisted shapes; credential values never leave the vault.
+import { config } from '../config/index.js';
 import { withTransaction } from '../db/transaction.js';
 import * as identities from '../repositories/externalIdentitiesRepository.js';
 import * as connections from '../repositories/integrationConnectionsRepository.js';
@@ -26,7 +27,11 @@ const handle = (fn) => async (req, res) => {
 const actorOf = (req) => ({ actor: req.user, ip: req.ip });
 
 export const listProviders = handle(async (req, res) => {
-  res.json({ providers: registry.list() });
+  // The URL to paste into the provider's webhook settings, when the public base URL is configured.
+  const base = config.integrations.publicWebhookBaseUrl;
+  res.json({
+    providers: registry.list().map((p) => ({ ...p, webhookUrl: base && p.capabilities.webhooks ? `${base}/api/v1/webhooks/${p.id}` : null })),
+  });
 });
 
 export const list = handle(async (req, res) => {

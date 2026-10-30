@@ -19,4 +19,5 @@ DROP TABLE IF EXISTS integration_auth_states;
 DROP TABLE IF EXISTS integration_credentials;
 DROP TABLE IF EXISTS integration_connections;
 
-DELETE FROM schema_migrations WHERE filename IN ('005_integrations.sql', '006_work_records.sql');
+-- 007 (Phase 3B) only added a column to integration_sync_cursors, which is dropped above.
+DELETE FROM schema_migrations WHERE filename IN ('005_integrations.sql', '006_work_records.sql', '007_sync_cursor_completion.sql');

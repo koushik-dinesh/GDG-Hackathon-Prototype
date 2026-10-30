@@ -395,3 +395,26 @@ Implemented as planned in `docs/PHASE_3A_PLAN.md` (the deviations are listed at 
 - **Frontend:** Admin → Integrations, connection detail, `/integrations/:provider/setup`.
 - **Tests:** backend 410/410, frontend 87/87.
 - **Next:** Phase 3B, the GitHub connector.
+
+## 16. Phase 3B — GitHub App integration (2026-10-30)
+
+Built on the Phase 3A framework with no GitHub-specific tables. Operations and the live verification procedure are in `docs/runbooks/integrations.md` §8.
+
+- **Backend:** `services/integrations/providers/github/`:
+  - `settings.js`: configuration and problems.
+  - `api.js`: App JWT, installation tokens, retry after a 401, GitHub error classification.
+  - `mappers.js`: shared by sync and webhooks, with stable ids and activity keys.
+  - `streams.js`: repository, issues (open pass + changes), pulls (+ reviews), issue comments, review comments, commits.
+  - `webhooks.js`: HMAC verification, App-target check, event handling.
+- **Framework changes:**
+  - Forced credential refresh (`ctx.credentials.refresh`).
+  - `invalid_request` maps to 400.
+  - Webhook lifecycle can request a resource refresh; the provider cannot reactivate a connection that is in error.
+  - Ordered streams with per-run completion (migration 007).
+  - Email-only automatic identity matching.
+  - Providers listing includes the webhook URL (`PUBLIC_WEBHOOK_BASE_URL`).
+- **Frontend:**
+  - Integrations: webhook URL and a "People in connected applications" card.
+  - Connection page: GitHub installation card.
+  - Project page: **Development** card.
+- **Tests:** backend 456/456, frontend 91/91, build OK. Coverage includes a fake GitHub server (`backend/test/integrations/fakeGithub.js`) and the contract suite run against the connector. Live GitHub is not yet verified.

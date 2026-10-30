@@ -19,6 +19,7 @@ import * as deliveries from '../../repositories/webhookDeliveriesRepository.js';
 import { AppError, conflict, notFound } from '../../utils/errors.js';
 import { logger } from '../../utils/logger.js';
 import { recordAudit } from '../audit.js';
+import { connectionService } from './connections.js';
 import { buildContext } from './context.js';
 import { ProviderError } from './errors.js';
 import { ingest } from './ingest.js';
@@ -99,6 +100,8 @@ export function createWebhookService({ registry = defaultRegistry } = {}) {
 
   async function applyLifecycle(connector, connection, lifecycle) {
     if (!lifecycle?.status || lifecycle.status === connection.status) return;
+    // The provider can't reactivate a connection that is in error (credentials) or that an admin disconnected.
+    if (lifecycle.status === 'active' && connection.status !== 'suspended') return;
     if (!['active', 'suspended', 'disconnected'].includes(lifecycle.status)) return;
     await withTransaction(async (conn) => {
       const fields = { status: lifecycle.status };
@@ -162,6 +165,11 @@ export function createWebhookService({ registry = defaultRegistry } = {}) {
     }
 
     await applyLifecycle(connector, connection, result?.lifecycle);
+    // Access changed at the provider (repositories added/removed, renamed, permissions): re-read
+    // the resource list. New resources arrive disabled; admin choices are kept.
+    if (result?.lifecycle?.refreshResources && result.lifecycle.status !== 'disconnected') {
+      await connectionService.refreshResources(connection.id);
+    }
     const envelopes = result?.envelopes ?? [];
     if (envelopes.length === 0) {
       await deliveries.setStatus(pool, delivery.id, 'processed', { error: null });

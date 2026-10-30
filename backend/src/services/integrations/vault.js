@@ -65,11 +65,12 @@ export function createVault(keyring = defaultKeyring) {
    * Returns { value, expiresAt } or null. With `refresh` (an async function returning
    * [{ kind, value, expiresAt }]), missing or soon-to-expire credentials are refreshed first.
    */
-  async function get(connectionId, kind, { refresh, refreshBeforeMs = DEFAULT_REFRESH_BEFORE_MS } = {}) {
+  async function get(connectionId, kind, { refresh, refreshBeforeMs = DEFAULT_REFRESH_BEFORE_MS, force = false } = {}) {
     assertInput(connectionId, kind);
     const row = await credentials.find(connectionId, kind);
     const expiresSoon = row?.expiresAt && row.expiresAt.getTime() - Date.now() <= refreshBeforeMs;
-    if (refresh && (!row || expiresSoon)) {
+    // force: the provider rejected the stored value (e.g. a token revoked early), get a new one.
+    if (refresh && (!row || expiresSoon || force)) {
       const fresh = await refresh();
       if (!Array.isArray(fresh)) throw new Error('refresh() must return an array of credentials');
       await withTransaction(async (conn) => {

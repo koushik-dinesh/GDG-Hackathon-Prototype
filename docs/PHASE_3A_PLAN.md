@@ -11,6 +11,10 @@ Status: **IMPLEMENTED (2026-10-30)**, steps 1–10 committed on `phase-2-work-ma
 - Two endpoints were added in step 8, which the data model needed: `PUT /external-records/:id/project` (a manual move, which locks the record) and identity matching (`GET/PATCH /integrations/identities`).
 - `handleWebhook()` returns `resourceRef` with its envelopes. Envelopes are only written for an enabled resource, so webhooks cannot bypass opt-in sync.
 - Maintenance runs every 6 hours under a single dedupe key, not once a day per date.
+- **Changed in Phase 3B:**
+  - Streams of a resource now run in the connector's order (parents first) instead of round-robin, so a comment never arrives before its issue in a backfill.
+  - Finished streams are marked per run (`007_sync_cursor_completion.sql`, `completed_at`), so a run spanning several jobs doesn't re-check them.
+  - Automatic identity matching is limited to a provider-verified email. Alias/name matching was removed as unsafe.
 Inputs: `WORKAGENT_CURRENT_STATE.md`, `WORKAGENT_MASTER_ROADMAP.md`, `WORKAGENT_NEXT_STEPS.md`, and a source audit of `backend/src` on 2026-10-30.
 Fixed decisions: GitHub App auth · existing Cloudflare Tunnel for dev webhooks · an encryption key per deployment, held in an environment variable · MySQL 8.4 · Express 5 · separate worker · MySQL job queue · no new npm dependencies.
 

@@ -13,3 +13,8 @@ export const refreshResources = (id) => api(`/integrations/${id}/resources/refre
 export const updateResource = (id, resourceId, body) => api(`/integrations/${id}/resources/${resourceId}`, { method: 'PATCH', body });
 export const listDeliveries = (id) => api(`/integrations/${id}/webhook-deliveries`);
 export const replayDelivery = (deliveryId) => api(`/integrations/webhook-deliveries/${deliveryId}/replay`, { method: 'POST' });
+
+// People in connected applications, matched to WorkAgent users by an admin.
+export const listIdentities = ({ provider, unmatched = false } = {}) =>
+  api(`/integrations/identities?${new URLSearchParams({ ...(provider && { provider }), unmatched: String(unmatched) })}`);
+export const matchIdentity = (id, userId) => api(`/integrations/identities/${id}`, { method: 'PATCH', body: { userId } });

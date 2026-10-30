@@ -1,5 +1,14 @@
 # WorkAgent — Next Steps (2026-10-30)
 
+> **Update: Phase 3B (GitHub) is implemented and tested against a fake GitHub. Live verification is pending.**
+>
+> 1. **Human input needed:**
+>    - create the GitHub App per `docs/runbooks/integrations.md` §8.1;
+>    - put its ID, slug, private key path and webhook secret, plus `PUBLIC_WEBHOOK_BASE_URL` and `CREDENTIALS_ENCRYPTION_KEY`, in `backend/.env`;
+>    - start the Cloudflare Tunnel limited to `/api/v1/webhooks/`.
+> 2. Run the live verification procedure (§8.4) and record the result in `WORKAGENT_CURRENT_STATE.md`.
+> 3. Then Phase 4: commitments, decisions, blockers, dependencies and insights on top of `external_records`, `activities` and `record_links`.
+
 > **Update (end of 2026-10-30): Phase 3A is complete.** It was built as planned in `docs/PHASE_3A_PLAN.md` (the deviations are listed at the top of that file) and is operated per `docs/runbooks/integrations.md`.
 > - Tests: backend 410/410, frontend 87/87, build OK.
 > - Verified in the browser on the test DB with the fake provider.

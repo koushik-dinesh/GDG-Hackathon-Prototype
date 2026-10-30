@@ -119,3 +119,102 @@ cd frontend && npm test && npm run build
 Then check:
 - `GET /api/v1/integrations/providers` as an admin lists the providers you expect, as `available`.
 - A worker started with `WORKER_JOB_TYPES=integration.sync` logs `integration providers` on start-up.
+
+## 8. GitHub (Phase 3B)
+
+WorkAgent connects to GitHub as a **GitHub App** (no personal access tokens). There is one App per deployment. Each company account the App is installed on becomes one connection.
+
+### 8.1 Create the App (once per deployment)
+
+1. On GitHub, open **Settings → Developer settings → GitHub Apps → New GitHub App** (on the organization, for an org-owned App).
+2. Fill in the App settings:
+   - **Name:** e.g. `WorkAgent <Company>`. Its URL name is the *slug* (`github.com/apps/<slug>`).
+   - **Homepage URL:** the WorkAgent URL.
+   - **Setup URL:** `https://<workagent-host>/integrations/github/setup`. Tick **Redirect on update**.
+     - Locally this is `http://localhost:5173/integrations/github/setup`. GitHub redirects the admin's browser, so localhost works.
+   - **Callback URL / "Request user authorization (OAuth) during installation":** leave empty and unticked. They are not used.
+   - **Webhook:** active.
+     - URL: `PUBLIC_WEBHOOK_BASE_URL/api/v1/webhooks/github`. Locally, use the Cloudflare Tunnel hostname (§3), which routes only `/api/v1/webhooks/`.
+     - Secret: `openssl rand -hex 32`. This becomes `GITHUB_WEBHOOK_SECRET`.
+   - **Repository permissions** (all **read-only**):
+     - Metadata (mandatory)
+     - Issues
+     - Pull requests
+     - Contents (needed for commit history; WorkAgent never downloads file contents)
+
+     Everything else: no access.
+   - **Subscribe to events:** Issues, Issue comment, Pull request, Pull request review, Pull request review comment, Push, Repository. Installation events are always sent.
+   - **Where can this App be installed:** *Only on this account* (recommended).
+3. Create the App, then from its settings page:
+   - note the **App ID**;
+   - **Generate a private key** (a `.pem` download). Store it outside the repository with `chmod 600`.
+4. Configure `backend/.env` (see `.env.example`):
+   - `GITHUB_APP_ID`
+   - `GITHUB_APP_SLUG`
+   - `GITHUB_APP_PRIVATE_KEY_PATH` (or `GITHUB_APP_PRIVATE_KEY`)
+   - `GITHUB_WEBHOOK_SECRET`
+   - `PUBLIC_WEBHOOK_BASE_URL`
+   - `CREDENTIALS_ENCRYPTION_KEY` (§1)
+
+   Restart the API and the workers. The API refuses to start with a malformed private key. Admin → Integrations should now show GitHub as available, with the webhook URL to paste.
+
+### 8.2 Connect and choose repositories
+
+1. Admin → Integrations → **Connect GitHub**. GitHub shows the install screen: choose the account, then *All* or *Only select repositories*.
+2. GitHub sends you back to WorkAgent. The installation is verified through the App's own credentials before anything is stored.
+   - "An organization owner must approve…" means the installation is waiting for an org owner. Connect again once it has been approved.
+3. On the connection page:
+   - Tick **Sync** for each repository to include, and map it to a project.
+   - New repositories granted later on GitHub arrive unticked.
+   - **Manage repository access on GitHub** opens the installation settings.
+4. Map people under **Integrations → People in connected applications**. GitHub accounts are never matched to users by login or name automatically.
+
+What is synced per repository:
+- repository metadata;
+- issues, including open ones older than the backfill window;
+- pull requests, with their reviews;
+- issue/PR comments and review comments;
+- default-branch commits.
+
+Webhooks bring changes in between syncs, including commits on other branches. No file contents, diffs or archives are downloaded.
+
+### 8.3 Rotation and revocation
+
+| What | How |
+|---|---|
+| Webhook secret | Put the new secret in GitHub. Set `GITHUB_WEBHOOK_SECRET_PREVIOUS` = old and `GITHUB_WEBHOOK_SECRET` = new, then restart. Both are accepted. Remove the previous one once no old deliveries remain. |
+| Private key | Generate a new key on GitHub (several can be active), switch `GITHUB_APP_PRIVATE_KEY_PATH`, restart, then delete the old key on GitHub. |
+| Installation tokens | Automatic: 1-hour tokens, renewed 5 minutes before expiry and after any 401. Stored only in the encrypted vault. |
+| App uninstalled on GitHub | The `installation.deleted` webhook marks the connection disconnected and deletes its credentials. Synced data stays. |
+| Suspended on GitHub | The connection shows *Suspended* and syncing stops; unsuspending resumes it. |
+
+### 8.4 Real GitHub verification procedure
+
+Run this against a real App and a test repository. Live verification has **not** been performed yet: the automated tests use a fake GitHub over HTTP.
+
+1. **Setup:**
+   - Create the App (§8.1) with the tunnel webhook URL.
+   - Create a private test repository containing:
+     - 2 issues (1 closed);
+     - 1 pull request with a review and a review comment;
+     - an issue comment;
+     - 2 commits on `main`.
+2. **Configure:** set `.env` and start the API, a worker and the tunnel.
+   - Check: `curl -i https://<tunnel>/api/v1/health` returns **404**.
+   - Check: an unsigned `POST` to the webhook URL returns **401**.
+3. **Connect:** Admin → Integrations → Connect GitHub. Install on the test repository only.
+   - **Expect:** the connection is *Connected*, the repository is listed (private), and *Stored credentials* shows "installation token".
+4. **First sync:** tick **Sync**, map to a project, then **Sync now**.
+   - **Expect:** health *Healthy*.
+   - **Expect** on the project page, under *Development*:
+     - the open issue and the PR;
+     - activity entries for created/closed, the review, the comments and the commits.
+5. **Webhooks:**
+   - **Edit** an issue title on GitHub. **Expect:** a delivery shows *Processed* within seconds and the title updates.
+   - **Redeliver** the same delivery from the App's *Advanced* tab. **Expect:** no duplicate records or activities.
+6. **Branch push:** push a commit to another branch. **Expect:** a commit activity with that branch.
+7. **Repository access:** add a second repository to the installation on GitHub. **Expect:** it appears, unticked.
+8. **Credential refresh:** revoke the installation token (or wait an hour) and **Sync now**. **Expect:** it still succeeds, because a new token is minted.
+9. **Uninstall:** uninstall the App on GitHub. **Expect:** status *Disconnected*, *Stored credentials* "None", and synced data still visible.
+10. **Secrets:** search the API and worker logs for `ghs_`, `BEGIN` and the webhook secret. **Expect:** no matches.
+11. **Record the result:** date, App ID (not the key), and any deviations, in `docs/WORKAGENT_CURRENT_STATE.md`.

@@ -72,7 +72,7 @@ describe('connector contract checks', () => {
 
 describe('provider registry', () => {
   it('registers the fake provider in tests and describes it without configuration values', () => {
-    const [entry] = registry.list();
+    const entry = registry.list().find((p) => p.id === 'fake');
     assert.deepEqual(entry, {
       id: 'fake',
       displayName: 'Fake provider',
@@ -81,8 +81,9 @@ describe('provider registry', () => {
       problem: null,
     });
     assert.equal(registry.get('fake'), fake);
-    assert.equal(registry.get('github'), null);
-    assert.equal(registry.problem('github'), 'Unknown provider');
+    assert.equal(registry.get('jira'), null);
+    assert.equal(registry.problem('jira'), 'Unknown provider');
+    assert.equal(registry.problem('github'), 'GITHUB_APP_ID is not set', 'GitHub is registered and unavailable until configured');
   });
 
   it('marks providers unavailable when their config or the encryption key is missing', () => {
