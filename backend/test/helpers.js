@@ -35,6 +35,10 @@ export async function resetDatabase() {
   await pool.query('DELETE FROM meetings'); // cascades to participants, transcripts, segments, runs, items
   await pool.query('DELETE FROM jobs');
   await pool.query('DELETE FROM audit_logs');
+  // Integrations (Phase 3A): resources reference connections and projects without cascading.
+  await pool.query('DELETE FROM webhook_deliveries');
+  await pool.query('DELETE FROM integration_resources'); // cascades to sync cursors
+  await pool.query('DELETE FROM integration_connections'); // cascades to credentials, auth states
   // Projects/teams reference users without cascading (history must survive in the app), so they go first.
   await pool.query('DELETE FROM projects'); // cascades to project_members
   await pool.query('DELETE FROM teams'); // cascades to team_members
