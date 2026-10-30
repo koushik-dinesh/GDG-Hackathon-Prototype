@@ -3,7 +3,7 @@ import express from 'express';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiRouter } from './routes/index.js';
 import { TRANSCRIPT_UPLOAD_PATH } from './routes/meetings.js';
-import { logger } from './utils/logger.js';
+import { logger, redactUrl } from './utils/logger.js';
 
 export function createApp() {
   const app = express();
@@ -29,7 +29,7 @@ export function createApp() {
     res.on('finish', () => {
       logger.info('request', {
         method: req.method,
-        path: req.originalUrl,
+        path: redactUrl(req.originalUrl),
         status: res.statusCode,
         ms: Number((process.hrtime.bigint() - start) / 1_000_000n),
       });

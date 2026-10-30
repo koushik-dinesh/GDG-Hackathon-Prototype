@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
@@ -10,6 +11,15 @@ if (Number(process.versions.node.split('.')[0]) < 22) {
 // Load backend/.env if present. Real environment variables always win.
 const envPath = fileURLToPath(new URL('../../.env', import.meta.url));
 if (existsSync(envPath)) process.loadEnvFile(envPath);
+
+// A 32-byte key written as base64 (standard or URL-safe). Generate with: openssl rand -base64 32
+const encryptionKey = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => v || undefined)
+  .refine((v) => !v || /^[A-Za-z0-9+/_-]+={0,2}$/.test(v), 'Must be base64 (generate with: openssl rand -base64 32)')
+  .refine((v) => !v || Buffer.from(v, 'base64').length === 32, 'Must decode to exactly 32 bytes (openssl rand -base64 32)');
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -86,6 +96,11 @@ const schema = z.object({
   // Queue AI extraction automatically once a Vexa transcript is saved.
   VEXA_AUTO_EXTRACT: z.enum(['true', 'false']).default('true'),
 
+  // Integrations (Phase 3A). Encrypts stored integration credentials (OAuth/installation tokens).
+  // PREVIOUS is only needed while rotating keys (see docs/PHASE_3A_PLAN.md §6).
+  CREDENTIALS_ENCRYPTION_KEY: encryptionKey,
+  CREDENTIALS_ENCRYPTION_KEY_PREVIOUS: encryptionKey,
+
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
   JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
@@ -106,6 +121,22 @@ const isTest = env.NODE_ENV === 'test';
 
 if (isProd && env.JWT_SECRET.startsWith('change-me')) {
   console.error('Refusing to start in production with the example JWT_SECRET.');
+  process.exit(1);
+}
+
+if (env.CREDENTIALS_ENCRYPTION_KEY_PREVIOUS && !env.CREDENTIALS_ENCRYPTION_KEY) {
+  console.error('CREDENTIALS_ENCRYPTION_KEY_PREVIOUS is set without CREDENTIALS_ENCRYPTION_KEY. See backend/.env.example.');
+  process.exit(1);
+}
+
+const decodeKey = (v) => (v ? Buffer.from(v, 'base64') : null);
+// Tests never see the deployment's real key: each test run gets a throwaway one.
+const encryptionKeys = isTest
+  ? { current: randomBytes(32), previous: null }
+  : { current: decodeKey(env.CREDENTIALS_ENCRYPTION_KEY), previous: decodeKey(env.CREDENTIALS_ENCRYPTION_KEY_PREVIOUS) };
+
+if (encryptionKeys.previous?.equals(encryptionKeys.current)) {
+  console.error('CREDENTIALS_ENCRYPTION_KEY_PREVIOUS must differ from CREDENTIALS_ENCRYPTION_KEY.');
   process.exit(1);
 }
 
@@ -173,6 +204,10 @@ export const config = {
     pollTimeoutMs: env.VEXA_POLL_TIMEOUT_MS,
     transcriptWaitMs: env.VEXA_TRANSCRIPT_WAIT_MS,
     autoExtract: env.VEXA_AUTO_EXTRACT === 'true',
+  },
+  integrations: {
+    // Buffers (or null). Only services/integrations/crypto.js reads these.
+    encryptionKeys,
   },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
