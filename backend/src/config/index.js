@@ -100,6 +100,8 @@ const schema = z.object({
   // PREVIOUS is only needed while rotating keys (see docs/PHASE_3A_PLAN.md §6).
   CREDENTIALS_ENCRYPTION_KEY: encryptionKey,
   CREDENTIALS_ENCRYPTION_KEY_PREVIOUS: encryptionKey,
+  // Registers the built-in fake provider (no network) to try the integration UI. Ignored in production.
+  INTEGRATIONS_FAKE_PROVIDER: z.enum(['true', 'false']).default('false'),
 
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
@@ -208,6 +210,8 @@ export const config = {
   integrations: {
     // Buffers (or null). Only services/integrations/crypto.js reads these.
     encryptionKeys,
+    // Always on in tests; never in production.
+    fakeProvider: isTest || (!isProd && env.INTEGRATIONS_FAKE_PROVIDER === 'true'),
   },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
