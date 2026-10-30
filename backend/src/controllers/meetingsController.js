@@ -1,9 +1,10 @@
 import { withTransaction } from '../db/transaction.js';
 import { extractionStatus } from './extractionController.js';
 import * as meetings from '../repositories/meetingsRepository.js';
+import * as projects from '../repositories/projectsRepository.js';
 import * as transcripts from '../repositories/transcriptsRepository.js';
 import * as users from '../repositories/usersRepository.js';
-import { audit } from '../services/audit.js';
+import { audit, recordAudit } from '../services/audit.js';
 import { badRequest, notFound } from '../utils/errors.js';
 
 const toParticipant = (row) => ({
@@ -22,6 +23,19 @@ async function assertActiveUsers(userIds) {
     throw badRequest('Some participants are not active users', missing.map((id) => ({ field: 'participantIds', message: `User ${id} not found or inactive` })));
   }
   return unique;
+}
+
+// A meeting can be linked to an existing, non-archived project, chosen manually by an admin.
+async function assertLinkableProject(projectId) {
+  if (!projectId) return;
+  const project = await projects.findById(projectId);
+  if (!project) throw badRequest('Invalid project', [{ field: 'projectId', message: 'Project not found' }]);
+  if (project.status === 'archived') throw badRequest('Invalid project', [{ field: 'projectId', message: 'This project is archived' }]);
+}
+
+async function recordProjectLink(conn, { actorUserId, meetingId, title, from, to, ip }) {
+  if (from) await recordAudit(conn, { actorUserId, action: 'project.meeting_unlinked', entityType: 'project', entityId: from, before: { meetingId, title }, ip });
+  if (to) await recordAudit(conn, { actorUserId, action: 'project.meeting_linked', entityType: 'project', entityId: to, after: { meetingId, title }, ip });
 }
 
 async function loadDetail(id) {
@@ -52,10 +66,14 @@ export async function get(req, res) {
 export async function create(req, res) {
   const { participantIds = [], ...fields } = req.body;
   const userIds = await assertActiveUsers(participantIds);
+  await assertLinkableProject(fields.projectId);
 
   const id = await withTransaction(async (conn) => {
     const meetingId = await meetings.create(conn, { ...fields, createdBy: req.user.id });
     await meetings.replaceParticipants(conn, meetingId, userIds);
+    if (fields.projectId) {
+      await recordProjectLink(conn, { actorUserId: req.user.id, meetingId, title: fields.title, from: null, to: fields.projectId, ip: req.ip });
+    }
     return meetingId;
   });
 
@@ -69,9 +87,15 @@ export async function update(req, res) {
   const { participantIds, ...fields } = req.body;
   const before = await loadDetail(id);
   const userIds = participantIds ? await assertActiveUsers(participantIds) : null;
+  const projectChanged = fields.projectId !== undefined && fields.projectId !== before.projectId;
+  if (projectChanged) await assertLinkableProject(fields.projectId);
 
   await withTransaction(async (conn) => {
     await meetings.update(conn, id, fields);
+    if (projectChanged) {
+      await meetings.moveItemsWithMeeting(conn, id, before.projectId, fields.projectId);
+      await recordProjectLink(conn, { actorUserId: req.user.id, meetingId: id, title: before.title, from: before.projectId, to: fields.projectId, ip: req.ip });
+    }
     if (userIds) await meetings.replaceParticipants(conn, id, userIds);
   });
 

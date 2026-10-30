@@ -5,3 +5,4 @@ export const approveActionItem = (id) => api(`/action-items/${id}/approve`, { me
 export const rejectActionItem = (id, reason) =>
   api(`/action-items/${id}/reject`, { method: 'POST', body: reason ? { reason } : {} });
 export const reopenActionItem = (id) => api(`/action-items/${id}/reopen`, { method: 'POST' });
+export const setActionItemProject = (id, projectId) => api(`/action-items/${id}/project`, { method: 'PUT', body: { projectId } });

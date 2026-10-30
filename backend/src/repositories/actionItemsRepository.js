@@ -6,6 +6,9 @@ const toNumber = (v) => (v === null || v === undefined ? null : Number(v));
 export const toActionItem = (row) => ({
   id: row.id,
   meetingId: row.meeting_id,
+  // Project association (Phase 2). Defaults to the meeting's project; independent of review/task status.
+  projectId: row.project_id ?? null,
+  project: row.project_id ? { id: row.project_id, name: row.project_name } : null,
   extractionRunId: row.extraction_run_id,
   // AI items come from an extraction run; manual items have none (and no AI confidence/evidence).
   source: row.extraction_run_id ? 'ai' : 'manual',
@@ -40,8 +43,9 @@ export const toEvidence = (row) => ({
 // DATE_FORMAT keeps due_date a plain calendar date (no timezone shifting).
 const ITEM_SELECT = `
   SELECT ai.*, DATE_FORMAT(ai.due_date, '%Y-%m-%d') AS due_date,
-         u.full_name AS assignee_full_name, u.email AS assignee_email, u.is_active AS assignee_is_active
-  FROM action_items ai LEFT JOIN users u ON u.id = ai.assignee_user_id`;
+         u.full_name AS assignee_full_name, u.email AS assignee_email, u.is_active AS assignee_is_active,
+         p.name AS project_name
+  FROM action_items ai LEFT JOIN users u ON u.id = ai.assignee_user_id LEFT JOIN projects p ON p.id = ai.project_id`;
 
 async function withEvidence(rows, conn = pool) {
   if (rows.length === 0) return [];
@@ -100,14 +104,14 @@ export async function setReviewStatus(conn, id, status, { actorId, reviewDetails
   );
 }
 
-/** Manual item: no extraction run, no AI confidence, no evidence. */
-export async function createManual(conn, meetingId, { title, description, priority, assigneeUserId, dueDate, actorId }) {
+/** Manual item: no extraction run, no AI confidence, no evidence. Project defaults to the meeting's. */
+export async function createManual(conn, meetingId, { title, description, priority, assigneeUserId, dueDate, projectId, actorId }) {
   const [result] = await conn.execute(
     `INSERT INTO action_items
-       (meeting_id, extraction_run_id, title, description, assignee_user_id, assignee_match, due_date, priority, flags, review_details)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, '[]', ?)`,
+       (meeting_id, project_id, extraction_run_id, title, description, assignee_user_id, assignee_match, due_date, priority, flags, review_details)
+     VALUES (?, COALESCE(?, (SELECT project_id FROM meetings WHERE id = ?)), NULL, ?, ?, ?, ?, ?, ?, '[]', ?)`,
     [
-      meetingId, title, description ?? null, assigneeUserId ?? null, assigneeUserId ? 'manual' : 'none', dueDate ?? null,
+      meetingId, projectId ?? null, meetingId, title, description ?? null, assigneeUserId ?? null, assigneeUserId ? 'manual' : 'none', dueDate ?? null,
       priority ?? 'medium', JSON.stringify({ source: 'manual', createdBy: actorId }),
     ],
   );
@@ -135,12 +139,13 @@ export async function replacePendingExtracted(conn, meetingId, runId, items) {
   );
   for (const item of items) {
     const [result] = await conn.execute(
+      // Extracted items take the meeting's project (never an AI guess); NULL when it has none.
       `INSERT INTO action_items
-         (meeting_id, extraction_run_id, title, description, assignee_name_raw, assignee_user_id, assignee_match,
+         (meeting_id, project_id, extraction_run_id, title, description, assignee_name_raw, assignee_user_id, assignee_match,
           due_date, due_date_raw, priority, flags, review_details, ai_confidence)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, (SELECT project_id FROM meetings WHERE id = ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        meetingId, runId, item.title, item.description, item.assigneeNameRaw, item.assigneeUserId, item.assigneeMatch,
+        meetingId, meetingId, runId, item.title, item.description, item.assigneeNameRaw, item.assigneeUserId, item.assigneeMatch,
         item.dueDate, item.dueDateRaw, item.priority, JSON.stringify(item.flags), JSON.stringify(item.reviewDetails),
         item.aiConfidence,
       ],
@@ -152,4 +157,8 @@ export async function replacePendingExtracted(conn, meetingId, runId, items) {
     }
   }
   return { deleted: deleted.affectedRows, inserted: items.length };
+}
+
+export async function setProject(conn, id, projectId) {
+  await conn.execute('UPDATE action_items SET project_id = ? WHERE id = ?', [projectId, id]);
 }

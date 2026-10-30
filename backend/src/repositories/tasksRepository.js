@@ -8,8 +8,9 @@ const toNumber = (v) => (v === null || v === undefined ? null : Number(v));
 const TASK_SELECT = `
   SELECT ai.id, ai.title, ai.description, ai.priority, ai.task_status, ai.approved_at, ai.updated_at,
          DATE_FORMAT(ai.due_date, '%Y-%m-%d') AS due_date, ai.due_date_raw,
-         m.id AS meeting_id, m.title AS meeting_title, m.scheduled_at AS meeting_scheduled_at
-  FROM action_items ai JOIN meetings m ON m.id = ai.meeting_id`;
+         m.id AS meeting_id, m.title AS meeting_title, m.scheduled_at AS meeting_scheduled_at,
+         p.id AS project_id, p.name AS project_name
+  FROM action_items ai JOIN meetings m ON m.id = ai.meeting_id LEFT JOIN projects p ON p.id = ai.project_id`;
 
 const SCOPE = `ai.assignee_user_id = ? AND ai.review_status = 'approved' AND m.status IN (?)`;
 
@@ -25,6 +26,7 @@ export const toTask = (row) => ({
   approvedAt: row.approved_at,
   updatedAt: row.updated_at,
   meeting: { id: row.meeting_id, title: row.meeting_title, scheduledAt: row.meeting_scheduled_at },
+  project: row.project_id ? { id: row.project_id, name: row.project_name } : null,
 });
 
 export async function listForUser(userId, { status } = {}) {

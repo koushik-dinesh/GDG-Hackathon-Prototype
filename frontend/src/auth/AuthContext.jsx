@@ -43,4 +43,5 @@ export function useAuth() {
   return ctx;
 }
 
-export const homePathFor = (user) => (user?.role === 'admin' ? '/admin' : '/my/tasks');
+const HOME = { admin: '/admin', manager: '/projects', employee: '/my/tasks' };
+export const homePathFor = (user) => HOME[user?.role] ?? '/my/tasks';

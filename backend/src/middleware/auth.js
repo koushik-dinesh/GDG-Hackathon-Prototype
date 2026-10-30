@@ -3,17 +3,19 @@ import * as users from '../repositories/usersRepository.js';
 import { verifySession } from '../services/authService.js';
 import { forbidden, unauthorized } from '../utils/errors.js';
 
-// Requires a valid session cookie. Re-reads the user every request so that
-// deactivation and role changes take effect immediately.
+// Requires a valid session cookie whose server-side session is still live (not logged out,
+// revoked or expired). Re-reads the user every request so that deactivation and role changes
+// take effect immediately.
 export async function requireAuth(req, res, next) {
   const token = req.cookies?.[config.cookie.name];
-  const userId = token && verifySession(token);
-  if (!userId) throw unauthorized();
+  const session = token && (await verifySession(token));
+  if (!session) throw unauthorized();
 
-  const row = await users.findById(userId);
+  const row = await users.findById(session.userId);
   if (!row || !row.is_active) throw unauthorized();
 
   req.user = users.toPublicUser(row);
+  req.sessionId = session.sessionId;
   next();
 }
 

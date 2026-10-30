@@ -89,6 +89,12 @@ const STATUS_STYLES = {
   failed: 'bg-red-100 text-red-700',
   approved: 'bg-emerald-100 text-emerald-800',
   emails_sent: 'bg-emerald-100 text-emerald-800',
+  // Project statuses (Phase 2)
+  planning: 'bg-sky-100 text-sky-800',
+  active: 'bg-emerald-100 text-emerald-800',
+  on_hold: 'bg-amber-100 text-amber-800',
+  completed: 'bg-slate-200 text-slate-800',
+  archived: 'bg-slate-100 text-slate-500',
 };
 
 export function StatusBadge({ status }) {

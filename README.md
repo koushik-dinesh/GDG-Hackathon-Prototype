@@ -36,12 +36,20 @@ Upload or capture a meeting transcript, let an AI model propose action items wit
 ## What it does today
 
 ### 1. Accounts and roles
-- Email and password sign-in. The session is stored in an `httpOnly`, `SameSite=Lax` cookie.
-- Two roles:
-  - **Admin**: manages users and meetings, reviews action items, sends emails.
-  - **Employee**: sees only their own tasks.
+- Email and password sign-in. The session is stored in an `httpOnly`, `SameSite=Lax` cookie and backed by a server-side session row, so **logout revokes it** immediately.
+- **Invitations**: an admin adds a person and emails them a one-time link (expires after `INVITATION_TTL_HOURS`, default 72 h). They choose their own password; no password is ever emailed.
+- Three roles:
+  - **Admin**: manages users and meetings, reviews action items, sends emails, manages every project and team.
+  - **Manager**: creates projects and teams and manages the ones they own or lead; sees their own tasks.
+  - **Employee**: sees their own tasks and the projects and teams they belong to (read-only).
 - Users can have **aliases** (alternative names or spellings) so that a name in a transcript maps to the right person.
-- Every request re-reads the user from the database, so deactivating a user or changing a role takes effect immediately.
+- Every request re-reads the user from the database, so deactivating a user or changing a role takes effect immediately. Deactivation also revokes all of the person's sessions and open invitations.
+
+### Projects and teams
+- **Projects** have a name, description, status (planning, active, on hold, completed, archived), owner, members and optional start/target dates. Archived projects are read-only.
+- A **meeting** can optionally belong to a project (chosen manually by an admin). Its action items follow the meeting's project; the project page lists its meetings, tasks (with review status and task status kept separate) and activity.
+- **Teams** are simple groups with an optional lead; a whole team can be added to a project at once.
+- Leaving a project or being deactivated never deletes tasks, meetings or audit history.
 
 ### 2. Meetings and transcripts
 - Create a meeting and attach a transcript by **manual upload**. This always works.
@@ -225,6 +233,8 @@ Set these values:
 | `SEED_ADMIN_PASSWORD` | Admin password, at least 12 characters |
 | `SEED_EMPLOYEE_EMAIL` | Optional. Email for a test employee account |
 | `SEED_EMPLOYEE_PASSWORD` | Employee password, at least 12 characters |
+| `SEED_MANAGER_EMAIL` / `SEED_MANAGER_PASSWORD` | Optional. A test manager account |
+| `INVITATION_TTL_HOURS` | Optional. Invitation link lifetime in hours (default 72). Invitations also need `EMAIL_PROVIDER`, `EMAIL_FROM` and `APP_PUBLIC_URL` |
 
 Generate `JWT_SECRET`:
 ```bash
@@ -404,14 +414,21 @@ Alternative: Vexa's hosted service is at `https://api.cloud.vexa.ai`. Use your k
 
 ### Admin
 1. Sign in as the admin. You land on `/admin`.
-2. Create a meeting, then upload a transcript or import one from Vexa.
-3. Start AI extraction (if configured) and wait for `review_pending`.
-4. Review each item: approve, edit or reject. Flagged items need attention.
-5. When review is finished, the meeting becomes `approved`. Open **Email notifications**, check the preview, and click **Send**.
-6. Watch progress in the meeting's action items.
+2. On **Users**, add people and email them an invitation (locally it arrives in Mailpit at http://localhost:8025). Resend or revoke it from the same page.
+3. On **Projects**, create a project, pick its owner and add members (or a whole team from **Teams**).
+4. Create a meeting (optionally in a project), then upload a transcript or import one from Vexa.
+5. Start AI extraction (if configured) and wait for `review_pending`.
+6. Review each item: approve, edit or reject. Flagged items need attention.
+7. When review is finished, the meeting becomes `approved`. Open **Email notifications**, check the preview, and click **Send**.
+8. Watch progress in the meeting's action items or on the project page.
+
+### Manager
+1. Sign in (after accepting an invitation). You land on **Projects**.
+2. Create projects and teams; you own and lead them. Edit details, change status, archive, and manage members.
+3. Your own assigned tasks are under **My tasks**.
 
 ### Employee
-1. Sign in. You land on **My tasks** (`/my/tasks`).
+1. Open the invitation link from your email, choose a password, then sign in. You land on **My tasks** (`/my/tasks`).
 2. Filter, search and sort your tasks. Overdue tasks are highlighted.
 3. Open a task to see the meeting context and the supporting transcript excerpt.
 4. Change a task's status as work progresses.
@@ -439,8 +456,20 @@ All routes are under `/api/v1`. Errors have the shape `{ "error": { "code", "mes
 |---|---|---|---|
 | GET | `/health` | public | Returns 503 if the database is unreachable |
 | POST | `/auth/login` | public | Body `{ email, password }`. Sets the session cookie. Limited to 10 attempts per IP and email per 15 minutes |
-| POST | `/auth/logout` | signed in | Clears the cookie |
+| POST | `/auth/logout` | signed in | Revokes the server-side session and clears the cookie |
+| POST | `/auth/invitations/verify` | public | Body `{ token }`. Who the invitation is for. Rate limited per IP |
+| POST | `/auth/invitations/accept` | public | Body `{ token, password }`. Sets the password (single use). Rate limited per IP |
 | GET | `/auth/me` | signed in | Current user |
+| GET/POST | `/users/:id/invitations` | admin | List / send (or resend) an invitation email |
+| POST | `/users/:id/invitations/revoke` | admin | Revoke the open invitation |
+| GET/POST | `/projects` | signed in | List visible projects / create (admin, manager) |
+| GET/PATCH | `/projects/:id` | member / owner, admin | Details / edit, status, archive (owner or admin; owner change admin only) |
+| GET/POST/DELETE | `/projects/:id/members[/:userId]` | member / owner, admin | Membership (`{ userIds }` or `{ teamId }`) |
+| GET | `/projects/:id/meetings`, `/tasks`, `/activity` | member | Tasks: everything for owner/admin, own tasks for others |
+| GET/POST/PATCH | `/teams[/:id]` | signed in | Teams (create: admin, manager; edit: lead or admin) |
+| POST/DELETE | `/teams/:id/members[/:userId]` | lead, admin | Team membership |
+| GET | `/directory/users` | admin, manager | Active people for pickers |
+| PUT | `/action-items/:id/project` | admin | Move one item to another project (any review state) |
 | GET | `/me/tasks` | employee | Own tasks, with filters |
 | GET | `/me/tasks/:id` | employee | One own task |
 | PATCH | `/me/tasks/:id/status` | employee | Change status (`fromStatus` check rejects stale updates) |
@@ -494,12 +523,13 @@ docker-compose.yml        MySQL and Mailpit
 ## Known limitations
 
 - **Prototype only.** Runs on a developer machine. Not deployed.
-- **Logout does not revoke tokens.** The JWT stays valid until it expires (`JWT_EXPIRES_IN`, default 8 hours). Add a denylist or session table before production.
+- **Sessions issued before Phase 2** (JWTs without a session id) are refused; everyone signs in again once after upgrading.
+- **Rate limits are in-memory** (login, invitation endpoints): per API process, reset on restart.
 - **Vexa bot is not verified end to end** against a real Google Meet call. It is built to Vexa's gateway API and tested with mocks.
 - **AI extraction costs money** per run and depends on the configured model's behaviour. Output quality varies by model and transcript.
 - **Email is local-only by default** (Mailpit). Real delivery needs SMTP or Resend credentials and, for Resend, a verified domain.
 - **Seed accounts** use example emails and passwords from `backend/.env`. Change them before sharing the app.
-- **Single-tenant.** There is no organisation or workspace separation.
+- **Single-company by design.** Each customer gets its own deployment and database; there is no tenant separation inside one install.
 
 ---
 
@@ -507,7 +537,6 @@ docker-compose.yml        MySQL and Mailpit
 
 - Deploy with production secrets, HTTPS and a real database host
 - Verify the Vexa bot against live Google Meet calls
-- Token revocation on logout
 - Configure real email delivery and domain verification
 - Broader testing with real meeting transcripts
 - Multi-organisation support

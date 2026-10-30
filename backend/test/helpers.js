@@ -35,7 +35,10 @@ export async function resetDatabase() {
   await pool.query('DELETE FROM meetings'); // cascades to participants, transcripts, segments, runs, items
   await pool.query('DELETE FROM jobs');
   await pool.query('DELETE FROM audit_logs');
-  await pool.query('DELETE FROM users'); // cascades to aliases
+  // Projects/teams reference users without cascading (history must survive in the app), so they go first.
+  await pool.query('DELETE FROM projects'); // cascades to project_members
+  await pool.query('DELETE FROM teams'); // cascades to team_members
+  await pool.query('DELETE FROM users'); // cascades to aliases, sessions, invitations
 }
 
 export async function createUser({ email, role = 'employee', isActive = true, password = PASSWORD, fullName }) {

@@ -1,8 +1,9 @@
 import { api } from './client.js';
 
-export function listMeetings({ status, q, limit = 25, offset = 0 } = {}) {
+export function listMeetings({ status, q, projectId, limit = 25, offset = 0 } = {}) {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (status) params.set('status', status);
+  if (projectId) params.set('projectId', String(projectId));
   if (q) params.set('q', q);
   return api(`/meetings?${params}`);
 }

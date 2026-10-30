@@ -13,8 +13,11 @@ const dueDate = optionalNullable(z.string().refine(isValidIsoDate, 'Use a valid 
 const assigneeUserId = optionalNullable(id);
 
 export const manualItemSchema = z
-  .object({ title, description, priority: z.enum(PRIORITIES).default('medium'), assigneeUserId, dueDate })
+  .object({ title, description, priority: z.enum(PRIORITIES).default('medium'), assigneeUserId, dueDate, projectId: optionalNullable(id) })
   .strict();
+
+// Project association is separate from review content, so it can change in any review state.
+const projectSchema = z.object({ projectId: z.preprocess((v) => (v === '' ? null : v), id.nullable()) }).strict();
 
 const updateSchema = z
   .object({
@@ -38,3 +41,4 @@ actionItemsRouter.patch('/:id', validate({ params: idParams, body: updateSchema 
 actionItemsRouter.post('/:id/approve', validate({ params: idParams }), itemsCtrl.approve);
 actionItemsRouter.post('/:id/reject', validate({ params: idParams, body: rejectSchema }), itemsCtrl.reject);
 actionItemsRouter.post('/:id/reopen', validate({ params: idParams }), itemsCtrl.reopen);
+actionItemsRouter.put('/:id/project', validate({ params: idParams, body: projectSchema }), itemsCtrl.setProject);

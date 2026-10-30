@@ -10,7 +10,8 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       // Same-origin API calls in dev, so the httpOnly session cookie just works.
-      '/api': { target: 'http://localhost:4000', changeOrigin: false },
+      // VITE_API_PROXY_TARGET overrides the backend address (e.g. when port 4000 is taken).
+      '/api': { target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:4000', changeOrigin: false },
     },
   },
 });

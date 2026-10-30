@@ -6,7 +6,9 @@ export function LoginPage() {
   const { user, loading, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
+  // Arriving from the activation page: confirm it worked and prefill the email.
+  const activated = location.state?.activated === true;
+  const [email, setEmail] = useState(activated ? (location.state?.email ?? '') : '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +39,12 @@ export function LoginPage() {
           <h1 className="text-xl font-semibold">Sign in</h1>
           <p className="mt-1 text-sm text-slate-500">Meeting to Action</p>
         </div>
+
+        {activated && !error && (
+          <div role="status" className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Your account is active. Sign in with your new password.
+          </div>
+        )}
 
         {error && (
           <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

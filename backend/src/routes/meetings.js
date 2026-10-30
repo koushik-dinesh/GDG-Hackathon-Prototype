@@ -28,6 +28,8 @@ const createSchema = z.object({
   scheduledAt: optionalNullable(isoDateTime),
   languageHint: optionalNullable(languageHint),
   participantIds: participantIds.optional(),
+  // Optional project (Phase 2); null/empty = no project.
+  projectId: optionalNullable(id),
 });
 
 const updateSchema = createSchema
@@ -40,6 +42,7 @@ const listQuery = z.object({
   from: isoDateTime.optional(),
   to: isoDateTime.optional(),
   q: z.string().trim().max(100).optional(),
+  projectId: z.union([z.literal('none'), id]).optional(),
   ...pagination,
 });
 

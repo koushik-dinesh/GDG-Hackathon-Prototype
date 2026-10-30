@@ -5,9 +5,19 @@ const NAV = {
   admin: [
     { to: '/admin', label: 'Dashboard', end: true },
     { to: '/admin/meetings', label: 'Meetings' },
+    { to: '/projects', label: 'Projects' },
+    { to: '/teams', label: 'Teams' },
     { to: '/admin/users', label: 'Users' },
   ],
-  employee: [{ to: '/my/tasks', label: 'My tasks' }],
+  manager: [
+    { to: '/projects', label: 'Projects' },
+    { to: '/teams', label: 'Teams' },
+    { to: '/my/tasks', label: 'My tasks' },
+  ],
+  employee: [
+    { to: '/my/tasks', label: 'My tasks' },
+    { to: '/projects', label: 'Projects' },
+  ],
 };
 
 export function AppShell() {
@@ -26,7 +36,7 @@ export function AppShell() {
           <div className="flex items-center gap-6">
             <span className="font-semibold text-slate-900">Meeting to Action</span>
             <nav className="flex gap-1">
-              {NAV[user.role].map((item) => (
+              {(NAV[user.role] ?? NAV.employee).map((item) => (
                 <NavLink
                   key={item.to}
                   to={item.to}

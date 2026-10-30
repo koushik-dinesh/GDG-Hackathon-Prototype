@@ -27,6 +27,8 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default('8h'),
   // Leave unset to get secure cookies only in production.
   COOKIE_SECURE: z.enum(['true', 'false']).optional(),
+  // How long an employee invitation link stays valid (default 72 h, max 30 days).
+  INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(72),
 
   // Claude (AI extraction). Without a key the API refuses to queue extractions.
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -124,6 +126,9 @@ export const config = {
   jwt: {
     secret: env.JWT_SECRET,
     expiresIn: env.JWT_EXPIRES_IN,
+  },
+  invitations: {
+    ttlHours: env.INVITATION_TTL_HOURS,
   },
   cookie: {
     name: 'mta_session',

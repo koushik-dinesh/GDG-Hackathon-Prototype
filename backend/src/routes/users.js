@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import * as usersCtrl from '../controllers/usersController.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { email, id, idParams, personName, role } from '../utils/validation.js';
 
@@ -34,3 +35,9 @@ usersRouter.delete('/:id', validate({ params: idParams }), usersCtrl.deactivate)
 usersRouter.get('/:id/aliases', validate({ params: idParams }), usersCtrl.listAliases);
 usersRouter.post('/:id/aliases', validate({ params: idParams, body: aliasSchema }), usersCtrl.addAlias);
 usersRouter.delete('/:id/aliases/:aliasId', validate({ params: aliasParams }), usersCtrl.removeAlias);
+
+// Invitations (Phase 2). Sending is limited per admin because each call sends an email.
+const inviteLimiter = rateLimit({ windowMs: 60_000, max: 20, key: (req) => `invite:${req.user.id}` });
+usersRouter.get('/:id/invitations', validate({ params: idParams }), usersCtrl.listInvitations);
+usersRouter.post('/:id/invitations', inviteLimiter, validate({ params: idParams }), usersCtrl.invite);
+usersRouter.post('/:id/invitations/revoke', validate({ params: idParams }), usersCtrl.revokeInvite);

@@ -96,6 +96,7 @@ export function MeetingsPage() {
                 <tr>
                   <th className="px-4 py-2 font-medium">Title</th>
                   <th className="px-4 py-2 font-medium">When</th>
+                  <th className="px-4 py-2 font-medium">Project</th>
                   <th className="px-4 py-2 font-medium">Status</th>
                   <th className="px-4 py-2 font-medium">Participants</th>
                   <th className="px-4 py-2 font-medium">Transcript</th>
@@ -110,6 +111,7 @@ export function MeetingsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-2 text-slate-600">{formatDateTime(m.scheduledAt ?? m.createdAt)}</td>
+                    <td className="px-4 py-2 text-slate-600">{m.project?.name ?? '—'}</td>
                     <td className="px-4 py-2">
                       <StatusBadge status={m.status} />
                     </td>

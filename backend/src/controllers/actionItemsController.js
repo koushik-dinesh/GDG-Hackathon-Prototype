@@ -4,8 +4,9 @@
 import { withTransaction } from '../db/transaction.js';
 import * as actionItems from '../repositories/actionItemsRepository.js';
 import * as meetings from '../repositories/meetingsRepository.js';
+import * as projects from '../repositories/projectsRepository.js';
 import * as users from '../repositories/usersRepository.js';
-import { audit } from '../services/audit.js';
+import { audit, recordAudit } from '../services/audit.js';
 import { REVIEWABLE_MEETING_STATUSES, ReviewRuleError, applyEdit, approvalProblems, transition } from '../services/review.js';
 import { AppError, badRequest, notFound } from '../utils/errors.js';
 
@@ -94,9 +95,47 @@ export const approve = reviewAction('approve');
 export const reject = reviewAction('reject');
 export const reopen = reviewAction('reopen');
 
+async function assertLinkableProject(projectId) {
+  if (!projectId) return;
+  const project = await projects.findById(projectId);
+  if (!project) throw badRequest('Invalid project', [{ field: 'projectId', message: 'Project not found' }]);
+  if (project.status === 'archived') throw badRequest('Invalid project', [{ field: 'projectId', message: 'This project is archived' }]);
+}
+
+/**
+ * Sets or clears an item's project (Phase 2). Allowed in any review state: it does not change
+ * the reviewed content, the assignee's task status or what the assignee can see.
+ */
+export async function setProject(req, res) {
+  const { id } = req.params;
+  const { projectId } = req.body;
+  await assertLinkableProject(projectId);
+  const { before, after } = await withTransaction(async (conn) => {
+    const item = await actionItems.findById(id, { conn, forUpdate: true });
+    if (!item) throw notFound('Action item not found');
+    await actionItems.setProject(conn, id, projectId);
+    await recordAudit(conn, {
+      actorUserId: req.user.id,
+      action: 'action_item.project_changed',
+      entityType: 'action_item',
+      entityId: id,
+      before: { projectId: item.projectId },
+      after: { projectId },
+      ip: req.ip,
+    });
+    return { before: item, after: await actionItems.findById(id, { conn }) };
+  });
+  if (before.projectId !== projectId) {
+    if (projectId) await audit({ actorUserId: req.user.id, action: 'project.task_linked', entityType: 'project', entityId: projectId, after: { actionItemId: id, title: after.title }, ip: req.ip });
+    if (before.projectId) await audit({ actorUserId: req.user.id, action: 'project.task_unlinked', entityType: 'project', entityId: before.projectId, before: { actionItemId: id, title: after.title }, ip: req.ip });
+  }
+  res.json({ actionItem: after });
+}
+
 export async function createManual(req, res) {
   const { id: meetingId } = req.params;
   await assertActiveAssignee(req.body.assigneeUserId);
+  await assertLinkableProject(req.body.projectId);
 
   const item = await withTransaction(async (conn) => {
     await lockMeeting(conn, meetingId);

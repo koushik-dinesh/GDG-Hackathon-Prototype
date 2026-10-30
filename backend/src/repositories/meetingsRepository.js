@@ -4,6 +4,9 @@ export function toMeeting(row) {
   return {
     id: row.id,
     title: row.title,
+    // Optional project (Phase 2). NULL for meetings that belong to no project.
+    projectId: row.project_id ?? null,
+    project: row.project_id ? { id: row.project_id, name: row.project_name, status: row.project_status } : null,
     meetingUrl: row.meeting_url,
     platform: row.platform,
     nativeMeetingId: row.native_meeting_id,
@@ -29,13 +32,21 @@ export function toMeeting(row) {
 const LIST_SELECT = `
   SELECT m.*,
          (SELECT COUNT(*) FROM meeting_participants mp WHERE mp.meeting_id = m.id) AS participant_count,
-         t.segment_count
+         t.segment_count, p.name AS project_name, p.status AS project_status
   FROM meetings m
-  LEFT JOIN transcripts t ON t.meeting_id = m.id`;
+  LEFT JOIN transcripts t ON t.meeting_id = m.id
+  LEFT JOIN projects p ON p.id = m.project_id`;
 
-export async function list({ status, from, to, q, limit, offset }) {
+export async function list({ status, from, to, q, projectId, limit, offset }) {
   const where = [];
   const params = [];
+  // projectId: a project id, or 'none' for meetings without a project.
+  if (projectId === 'none') {
+    where.push('m.project_id IS NULL');
+  } else if (projectId) {
+    where.push('m.project_id = ?');
+    params.push(projectId);
+  }
   if (status) {
     where.push('m.status = ?');
     params.push(status);
@@ -76,17 +87,18 @@ export async function findByIdForUpdate(conn, id) {
   return rows[0] ?? null;
 }
 
-export async function create(conn, { title, meetingUrl, scheduledAt, languageHint, createdBy }) {
+export async function create(conn, { title, meetingUrl, scheduledAt, languageHint, projectId, createdBy }) {
   const [result] = await conn.execute(
-    `INSERT INTO meetings (title, meeting_url, scheduled_at, language_hint, created_by, status)
-     VALUES (?, ?, ?, ?, ?, 'draft')`,
-    [title, meetingUrl, scheduledAt ?? null, languageHint ?? null, createdBy],
+    `INSERT INTO meetings (title, project_id, meeting_url, scheduled_at, language_hint, created_by, status)
+     VALUES (?, ?, ?, ?, ?, ?, 'draft')`,
+    [title, projectId ?? null, meetingUrl, scheduledAt ?? null, languageHint ?? null, createdBy],
   );
   return result.insertId;
 }
 
 const UPDATABLE = {
   title: 'title',
+  projectId: 'project_id',
   meetingUrl: 'meeting_url',
   scheduledAt: 'scheduled_at',
   languageHint: 'language_hint',
@@ -143,4 +155,17 @@ export async function findActiveBotOnLink(conn, platform, nativeMeetingId, exclu
     [platform, nativeMeetingId, excludeId],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Moves a meeting's action items along when the meeting's project changes: items that followed
+ * the meeting (same project as before, including none) get the new one. Items an admin assigned
+ * to a different project on purpose keep theirs.
+ */
+export async function moveItemsWithMeeting(conn, meetingId, fromProjectId, toProjectId) {
+  const [result] = await conn.execute(
+    'UPDATE action_items SET project_id = ? WHERE meeting_id = ? AND project_id <=> ?',
+    [toProjectId, meetingId, fromProjectId],
+  );
+  return result.affectedRows;
 }

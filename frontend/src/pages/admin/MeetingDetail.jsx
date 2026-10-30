@@ -138,6 +138,15 @@ export function MeetingDetailPage() {
             </Detail>
             <Detail label="Scheduled for">{formatDateTime(meeting.scheduledAt)}</Detail>
             <Detail label="Language">{meeting.languageHint ?? 'Auto-detect'}</Detail>
+            <Detail label="Project">
+              {meeting.project ? (
+                <Link to={`/projects/${meeting.project.id}`} className="text-slate-900 underline">
+                  {meeting.project.name}
+                </Link>
+              ) : (
+                <span className="text-slate-500">None</span>
+              )}
+            </Detail>
             <Detail label="Created">{formatDateTime(meeting.createdAt)}</Detail>
             <Detail label="Participants" wide>
               {meeting.participants.length === 0 ? (

@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { addAlias, createUser, deactivateUser, listUsers, removeAlias, updateUser } from '../../api/users.js';
+import {
+  addAlias,
+  createUser,
+  deactivateUser,
+  listUsers,
+  removeAlias,
+  revokeInvitation,
+  sendInvitation,
+  updateUser,
+} from '../../api/users.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { EmptyState } from '../../components/EmptyState.jsx';
 import { Button, Card, ErrorAlert, Field, Loading, SuccessAlert, inputClass } from '../../components/ui.jsx';
@@ -36,9 +45,9 @@ export function UsersPage() {
       </div>
 
       <CreateUserForm
-        onCreated={(user) => {
+        onCreated={(user, message) => {
           setUsers((list) => [...(list ?? []), user]);
-          setNotice(`${user.fullName} added. They can't sign in until the invitation flow is built (later phase).`);
+          setNotice(message);
         }}
       />
       <SuccessAlert>{notice}</SuccessAlert>
@@ -60,6 +69,7 @@ export function UsersPage() {
 function CreateUserForm({ onCreated }) {
   const empty = { fullName: '', email: '', role: 'employee' };
   const [form, setForm] = useState(empty);
+  const [invite, setInvite] = useState(true);
   const [errors, setErrors] = useState({});
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -77,8 +87,18 @@ function CreateUserForm({ onCreated }) {
     setError(null);
     try {
       const { user } = await createUser({ ...form, fullName: form.fullName.trim(), email: form.email.trim() });
-      onCreated(user);
       setForm(empty);
+      if (!invite) {
+        onCreated(user, `${user.fullName} added. Send an invitation when they should activate their account.`);
+        return;
+      }
+      // The account exists either way; a failed email only means the invitation must be resent.
+      try {
+        const { invitation } = await sendInvitation(user.id);
+        onCreated({ ...user, invitation }, `${user.fullName} added and an invitation was emailed to ${user.email}.`);
+      } catch (err) {
+        onCreated(user, `${user.fullName} added, but the invitation was not sent: ${err.message}`);
+      }
     } catch (err) {
       setErrors(fieldErrorsFrom(err));
       setError(errorSummary(err));
@@ -100,14 +120,17 @@ function CreateUserForm({ onCreated }) {
           </Field>
           <Field label="Role" error={errors.role}>
             <select className={inputClass} value={form.role} onChange={set('role')}>
-              <option value="employee">Employee</option>
-              <option value="admin">Admin</option>
+              <RoleOptions />
             </select>
           </Field>
           <Button type="submit" disabled={saving} className="sm:mt-6">
             {saving ? 'Adding…' : 'Add user'}
           </Button>
         </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={invite} onChange={(e) => setInvite(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+          Email an invitation so they can choose a password
+        </label>
       </form>
     </Card>
   );
@@ -121,6 +144,7 @@ function UserRow({ user, onChange }) {
   const [errors, setErrors] = useState({});
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
 
   function startEdit() {
     setForm({ fullName: user.fullName, email: user.email, role: user.role });
@@ -132,6 +156,7 @@ function UserRow({ user, onChange }) {
   async function run(fn) {
     setBusy(true);
     setError(null);
+    setNotice('');
     try {
       await fn();
     } catch (err) {
@@ -155,12 +180,27 @@ function UserRow({ user, onChange }) {
     });
   };
 
+  const invite = () =>
+    run(async () => {
+      const { invitation } = await sendInvitation(user.id);
+      onChange({ ...user, invitation });
+      setNotice(`Invitation emailed to ${user.email}.`);
+    });
+
+  const revoke = () =>
+    run(async () => {
+      if (!window.confirm(`Revoke the invitation for ${user.fullName}? The link in their email will stop working.`)) return;
+      await revokeInvitation(user.id);
+      onChange({ ...user, invitation: { ...user.invitation, status: 'revoked' } });
+      setNotice('Invitation revoked.');
+    });
+
   const toggleActive = () =>
     run(async () => {
       if (user.isActive) {
-        if (!window.confirm(`Deactivate ${user.fullName}? They will no longer be able to sign in or be assigned tasks.`)) return;
+        if (!window.confirm(`Deactivate ${user.fullName}? They will be signed out everywhere, can no longer sign in or be assigned tasks, and any open invitation is revoked. Their history is kept.`)) return;
         await deactivateUser(user.id);
-        onChange({ ...user, isActive: false });
+        onChange({ ...user, isActive: false, invitation: user.invitation?.status === 'pending' ? { ...user.invitation, status: 'revoked' } : user.invitation });
       } else {
         const { user: updated } = await updateUser(user.id, { isActive: true });
         onChange(updated);
@@ -180,8 +220,7 @@ function UserRow({ user, onChange }) {
             </Field>
             <Field label="Role" error={errors.role} hint={isSelf ? 'You cannot change your own role.' : undefined}>
               <select className={inputClass} value={form.role} disabled={isSelf} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                <option value="employee">Employee</option>
-                <option value="admin">Admin</option>
+                <RoleOptions />
               </select>
             </Field>
           </div>
@@ -206,12 +245,22 @@ function UserRow({ user, onChange }) {
             <div className="mt-1 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-slate-100 px-2 py-0.5 capitalize text-slate-700">{user.role}</span>
               {!user.isActive && <span className="rounded-full bg-red-100 px-2 py-0.5 text-red-700">inactive</span>}
-              {user.isActive && !user.hasPassword && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">no password yet</span>
-              )}
+              {user.isActive && !user.hasPassword && <InvitationBadge invitation={user.invitation} />}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {user.isActive && !user.hasPassword && (
+              <>
+                <Button variant="secondary" onClick={invite} disabled={busy}>
+                  {user.invitation ? 'Resend invitation' : 'Send invitation'}
+                </Button>
+                {user.invitation?.status === 'pending' && (
+                  <Button variant="danger" onClick={revoke} disabled={busy}>
+                    Revoke invitation
+                  </Button>
+                )}
+              </>
+            )}
             <Button variant="secondary" onClick={startEdit} disabled={busy}>
               Edit
             </Button>
@@ -222,6 +271,11 @@ function UserRow({ user, onChange }) {
             )}
           </div>
           {!editing && error && <ErrorAlert error={error} className="w-full" />}
+          {!editing && notice && (
+            <p role="status" className="w-full text-sm text-emerald-700">
+              {notice}
+            </p>
+          )}
         </div>
       )}
       <AliasEditor user={user} onChange={(aliases) => onChange({ ...user, aliases })} />
@@ -304,5 +358,35 @@ function AliasEditor({ user, onChange }) {
       {warning && <p className="mt-2 text-xs text-amber-700">{warning}</p>}
       <ErrorAlert error={error} className="mt-2" />
     </div>
+  );
+}
+
+function RoleOptions() {
+  return (
+    <>
+      <option value="employee">Employee</option>
+      <option value="manager">Manager</option>
+      <option value="admin">Admin</option>
+    </>
+  );
+}
+
+const INVITATION_LABEL = {
+  pending: ['bg-sky-100 text-sky-800', 'invitation sent'],
+  expired: ['bg-amber-100 text-amber-800', 'invitation expired'],
+  revoked: ['bg-slate-100 text-slate-600', 'invitation revoked'],
+  failed: ['bg-red-100 text-red-700', 'invitation failed to send'],
+  accepted: ['bg-emerald-100 text-emerald-800', 'invitation accepted'],
+};
+
+// Shown for active accounts that have no password yet.
+export function InvitationBadge({ invitation }) {
+  if (!invitation) return <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">not invited yet</span>;
+  const [style, label] = INVITATION_LABEL[invitation.status] ?? INVITATION_LABEL.pending;
+  const title = invitation.status === 'pending' && invitation.expiresAt ? `Expires ${new Date(invitation.expiresAt).toLocaleString()}` : undefined;
+  return (
+    <span className={`rounded-full px-2 py-0.5 ${style}`} title={title}>
+      {label}
+    </span>
   );
 }

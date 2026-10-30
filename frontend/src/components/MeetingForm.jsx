@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { errorSummary, fieldErrorsFrom, fromLocalInput, toLocalInput } from '../utils/format.js';
 import { ParticipantPicker } from './ParticipantPicker.jsx';
+import { ProjectSelect } from './ProjectSelect.jsx';
 import { Button, ErrorAlert, Field, inputClass } from './ui.jsx';
 
 // Shared by the create page and the meeting detail "Edit" mode.
@@ -11,6 +12,7 @@ export function MeetingForm({ initial, submitLabel, onSubmit, onCancel }) {
     scheduledAt: toLocalInput(initial?.scheduledAt),
     languageHint: initial?.languageHint ?? '',
     participantIds: initial?.participants?.map((p) => p.id) ?? [],
+    projectId: initial?.projectId ?? null,
   });
   const [errors, setErrors] = useState({});
   const [error, setError] = useState(null);
@@ -35,6 +37,7 @@ export function MeetingForm({ initial, submitLabel, onSubmit, onCancel }) {
         scheduledAt: fromLocalInput(form.scheduledAt),
         languageHint: form.languageHint.trim() || null,
         participantIds: form.participantIds,
+        projectId: form.projectId,
       });
     } catch (err) {
       setErrors(fieldErrorsFrom(err));
@@ -59,6 +62,14 @@ export function MeetingForm({ initial, submitLabel, onSubmit, onCancel }) {
         </Field>
         <Field label="Language" error={errors.languageHint} hint='Optional, e.g. "en". Leave empty for auto-detect.'>
           <input className={inputClass} value={form.languageHint} onChange={set('languageHint')} maxLength={10} />
+        </Field>
+        <Field label="Project" error={errors.projectId} hint="Optional. Its action items are listed on the project page.">
+          <ProjectSelect
+            value={form.projectId}
+            current={initial?.project}
+            onChange={(projectId) => setForm((f) => ({ ...f, projectId }))}
+            disabled={saving}
+          />
         </Field>
       </div>
 

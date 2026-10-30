@@ -1,4 +1,4 @@
-// Development-only seed. Creates the admin (required) and an employee (optional)
+// Development-only seed. Creates the admin (required) and a manager and an employee (optional)
 // from SEED_* environment variables. Existing users are left untouched.
 import { config } from '../../config/index.js';
 import { pool } from '../pool.js';
@@ -11,7 +11,7 @@ const MIN_PASSWORD_LENGTH = 12;
 function readAccount(prefix, role, required) {
   const email = process.env[`${prefix}_EMAIL`]?.trim().toLowerCase();
   const password = process.env[`${prefix}_PASSWORD`];
-  const fullName = process.env[`${prefix}_NAME`]?.trim() || (role === 'admin' ? 'Dev Admin' : 'Dev Employee');
+  const fullName = process.env[`${prefix}_NAME`]?.trim() || ({ admin: 'Dev Admin', manager: 'Dev Manager' }[role] ?? 'Dev Employee');
 
   if (!email && !password && !required) return null;
   if (!email || !password) throw new Error(`${prefix}_EMAIL and ${prefix}_PASSWORD must both be set`);
@@ -24,9 +24,11 @@ function readAccount(prefix, role, required) {
 async function seed() {
   if (config.isProd) throw new Error('The dev seed must not run with NODE_ENV=production');
 
-  const accounts = [readAccount('SEED_ADMIN', 'admin', true), readAccount('SEED_EMPLOYEE', 'employee', false)].filter(
-    Boolean,
-  );
+  const accounts = [
+    readAccount('SEED_ADMIN', 'admin', true),
+    readAccount('SEED_MANAGER', 'manager', false),
+    readAccount('SEED_EMPLOYEE', 'employee', false),
+  ].filter(Boolean);
 
   for (const account of accounts) {
     if (await users.findByEmailWithHash(account.email)) {
