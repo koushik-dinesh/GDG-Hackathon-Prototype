@@ -13,7 +13,7 @@
     "worker:dev": "node --watch src/worker.js",
     "migrate": "node src/db/migrate.js",
     "seed": "node src/db/seeds/devUsers.js",
-    "test": "NODE_ENV=test node --test --test-concurrency=1 'test/**/*.test.js'"
+    "test": "NODE_ENV=test MEETING_TIMEZONE=UTC node --test --test-concurrency=1 'test/**/*.test.js'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

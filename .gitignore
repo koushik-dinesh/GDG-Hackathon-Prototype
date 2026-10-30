@@ -21,3 +21,6 @@ npm-debug.log*
 
 # Local Claude Code preview config (contains machine-specific paths)
 .claude/launch.json
+
+# Runtime logs and PIDs from start.sh / end.sh
+.run/

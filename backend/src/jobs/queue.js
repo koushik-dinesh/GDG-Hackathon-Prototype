@@ -151,7 +151,8 @@ export async function reschedule(job, delayMs) {
 /**
  * Records a failed attempt. Retries with backoff while attempts remain and the error is
  * retryable; otherwise marks the job 'failed' (permanent error) or 'dead' (retries exhausted).
- * Returns { final, status }.
+ * Returns { final, status, owned }. owned=false means this worker had lost its lease (the job
+ * was recovered and possibly re-claimed by another worker), so nothing was recorded.
  */
 export async function fail(job, err) {
   const retryable = err?.retryable !== false;
@@ -159,22 +160,23 @@ export async function fail(job, err) {
   const status = final ? (retryable ? 'dead' : 'failed') : 'pending';
   const message = truncate(`${err?.name ?? 'Error'}: ${err?.message ?? String(err)}`);
 
+  let result;
   if (final) {
-    await pool.execute(
+    [result] = await pool.execute(
       `UPDATE jobs SET status = ?, dedupe_key = NULL, locked_at = NULL, locked_by = NULL, last_error = ?
-       WHERE id = ? AND locked_by = ?`,
+       WHERE id = ? AND locked_by = ? AND status = 'running'`,
       [status, message, job.id, job.lockedBy],
     );
   } else {
     const delaySeconds = Math.ceil(backoffMs(job.attempts) / 1000);
-    await pool.execute(
+    [result] = await pool.execute(
       `UPDATE jobs SET status = 'pending', locked_at = NULL, locked_by = NULL, last_error = ?,
               run_at = DATE_ADD(NOW(), INTERVAL ? SECOND)
-       WHERE id = ? AND locked_by = ?`,
+       WHERE id = ? AND locked_by = ? AND status = 'running'`,
       [message, delaySeconds, job.id, job.lockedBy],
     );
   }
-  return { final, status };
+  return { final, status, owned: result.affectedRows > 0 };
 }
 
 /**

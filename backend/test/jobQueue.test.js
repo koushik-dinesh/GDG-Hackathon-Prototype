@@ -53,7 +53,7 @@ describe('failure handling', () => {
     const id = await queue.enqueue('test.job', {}, { maxAttempts: 2 });
     let job = await queue.claimNext('w1');
     let res = await queue.fail(job, new Error('boom'));
-    assert.deepEqual(res, { final: false, status: 'pending' });
+    assert.deepEqual(res, { final: false, status: 'pending', owned: true });
     let row = await jobRow(id);
     assert.equal(row.status, 'pending');
     assert.equal(row.attempts, 1);
@@ -64,7 +64,7 @@ describe('failure handling', () => {
     await makeDue(id);
     job = await queue.claimNext('w1');
     res = await queue.fail(job, new Error('boom again'));
-    assert.deepEqual(res, { final: true, status: 'dead' });
+    assert.deepEqual(res, { final: true, status: 'dead', owned: true });
     row = await jobRow(id);
     assert.equal(row.status, 'dead');
     assert.equal(row.attempts, 2);
@@ -74,7 +74,7 @@ describe('failure handling', () => {
     const id = await queue.enqueue('test.job', {}, { dedupeKey: 'perm' });
     const job = await queue.claimNext('w1');
     const res = await queue.fail(job, new queue.PermanentJobError('bad input'));
-    assert.deepEqual(res, { final: true, status: 'failed' });
+    assert.deepEqual(res, { final: true, status: 'failed', owned: true });
     const row = await jobRow(id);
     assert.equal(row.dedupe_key, null);
     assert.equal(row.attempts, 1);
@@ -116,6 +116,39 @@ describe('leases', () => {
     assert.equal(await queue.complete(stolen), false);
     assert.equal(await queue.heartbeat(stolen), false);
     assert.equal(await queue.heartbeat(job), true);
+  });
+
+  it('a worker that lost its lease cannot fail the job, and its failure hook does not run', async () => {
+    const id = await queue.enqueue('test.job', {}, { maxAttempts: 1, dedupeKey: 'lease:1' });
+    const job = await queue.claimNext('w1');
+    // w1 stalls; its lease expires, the job is recovered and w2 claims it.
+    await pool.query('UPDATE jobs SET locked_at = DATE_SUB(NOW(), INTERVAL 10 MINUTE), max_attempts = 2 WHERE id = ?', [id]);
+    await recover({});
+    const takenOver = await queue.claimNext('w2');
+    assert.equal(takenOver.id, id);
+
+    assert.deepEqual(await queue.fail(job, new queue.PermanentJobError('late failure')), { final: true, status: 'failed', owned: false });
+    let row = await jobRow(id);
+    assert.equal(row.status, 'running', 'the new owner keeps the job');
+    assert.equal(row.locked_by, 'w2');
+    assert.equal(row.dedupe_key, 'lease:1');
+
+    // Through the runner: the stale worker's error must not trigger the failure hook.
+    const hooks = [];
+    const result = await runJob(job, {
+      'test.job': {
+        run: async () => {
+          throw new queue.PermanentJobError('late failure');
+        },
+        onFailure: async (j, err, { final }) => hooks.push(final),
+      },
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 'lost_lease');
+    assert.deepEqual(hooks, []);
+    row = await jobRow(id);
+    assert.equal(row.status, 'running');
+    assert.equal(row.locked_by, 'w2');
   });
 
   it('recovers jobs from a crashed worker; exhausted ones die and run the failure hook', async () => {

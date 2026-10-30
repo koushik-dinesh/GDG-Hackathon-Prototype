@@ -27,7 +27,13 @@ export async function runJob(job, handlers) {
       logger.debug('job rescheduled', { ...log, delayMs: err.delayMs, reason: err.message });
       return { ok: true, rescheduled: true };
     }
-    const { final, status } = await queue.fail(job, err);
+    const { final, status, owned } = await queue.fail(job, err);
+    if (!owned) {
+      // The lease expired and the job was recovered (maybe re-claimed by another worker). Running
+      // the failure hook now could mark a meeting or email failed while the new owner works on it.
+      logger.warn('job failed after its lease was lost; failure not recorded', { ...log, error: err.message, ms: Date.now() - started });
+      return { ok: false, final: false, status: 'lost_lease' };
+    }
     // Never log payloads or provider responses here; they may contain transcript text.
     logger[final ? 'error' : 'warn']('job failed', { ...log, status, final, error: err.message, ms: Date.now() - started });
     if (handler?.onFailure) {
