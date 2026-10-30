@@ -53,6 +53,7 @@ integrationsRouter.post('/:provider/callback', validate({ params: providerParams
 
 integrationsRouter.get('/:id', validate({ params: idParams }), ctrl.get);
 integrationsRouter.patch('/:id', validate({ params: idParams, body: updateSchema }), ctrl.update);
+integrationsRouter.post('/:id/sync', validate({ params: idParams }), ctrl.syncNow);
 integrationsRouter.post('/:id/disconnect', validate({ params: idParams, body: disconnectSchema }), ctrl.disconnect);
 integrationsRouter.get('/:id/resources', validate({ params: idParams }), ctrl.listResources);
 integrationsRouter.post('/:id/resources/refresh', validate({ params: idParams }), ctrl.refreshResources);

@@ -3,10 +3,12 @@
 import * as connections from '../repositories/integrationConnectionsRepository.js';
 import * as resources from '../repositories/integrationResourcesRepository.js';
 import * as deliveries from '../repositories/webhookDeliveriesRepository.js';
+import { audit } from '../services/audit.js';
 import { connectionService, toAppError } from '../services/integrations/connections.js';
 import { registry } from '../services/integrations/registry.js';
+import * as scheduler from '../services/integrations/scheduler.js';
 import { vault } from '../services/integrations/vault.js';
-import { notFound } from '../utils/errors.js';
+import { conflict, notFound } from '../utils/errors.js';
 
 // Provider and credential failures become API errors with safe messages.
 const handle = (fn) => async (req, res) => {
@@ -68,6 +70,15 @@ export const refreshResources = handle(async (req, res) => {
 export const updateResource = handle(async (req, res) => {
   await connectionService.loadConnection(req.params.id);
   res.json({ resource: await connectionService.updateResource(req.params.id, req.params.resourceId, req.body, actorOf(req)) });
+});
+
+// Queues a sync of every enabled resource now (the worker runs it).
+export const syncNow = handle(async (req, res) => {
+  const connection = await connectionService.loadConnection(req.params.id);
+  if (connection.status !== 'active' || !connection.isEnabled) throw conflict('Only active, enabled integrations can sync');
+  const queued = await scheduler.syncConnectionNow(connection.id);
+  await audit({ actorUserId: req.user.id, action: 'integration.sync_requested', entityType: 'integration_connection', entityId: connection.id, after: { queued }, ip: req.ip });
+  res.status(202).json({ queued });
 });
 
 export const disconnect = handle(async (req, res) => {

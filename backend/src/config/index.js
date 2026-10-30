@@ -102,12 +102,28 @@ const schema = z.object({
   CREDENTIALS_ENCRYPTION_KEY_PREVIOUS: encryptionKey,
   // Registers the built-in fake provider (no network) to try the integration UI. Ignored in production.
   INTEGRATIONS_FAKE_PROVIDER: z.enum(['true', 'false']).default('false'),
+  // How often each enabled resource is re-synced (reconciliation behind webhooks).
+  INTEGRATION_SYNC_INTERVAL_MIN: z.coerce.number().int().min(1).max(1440).default(15),
+  // First sync of a resource covers this many days (plus whatever the provider says is still open).
+  INTEGRATION_BACKFILL_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
+  // One sync job runs at most this long / this many provider requests, then yields to other jobs.
+  INTEGRATION_SYNC_CHUNK_MS: z.coerce.number().int().min(1000).max(120_000).default(20_000),
+  INTEGRATION_SYNC_CHUNK_REQUESTS: z.coerce.number().int().min(1).max(1000).default(10),
+  // Pause a connection when fewer provider requests than this remain in its rate-limit window.
+  INTEGRATION_RATE_LIMIT_RESERVE: z.coerce.number().int().min(0).default(200),
 
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
   JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
   JOB_BACKOFF_BASE_MS: z.coerce.number().int().min(0).default(30_000),
   JOB_STALE_AFTER_MS: z.coerce.number().int().min(10_000).default(300_000),
+  // Optional comma list: this worker only runs these job types (e.g. a dedicated integrations
+  // worker with "integration.sync,integration.webhook"). Empty = every type.
+  WORKER_JOB_TYPES: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []))
+    .refine((list) => list.every((t) => /^[a-z][a-z0-9_.]{1,63}$/.test(t)), 'Comma-separated job types, e.g. integration.sync,integration.webhook'),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -212,11 +228,16 @@ export const config = {
     encryptionKeys,
     // Always on in tests; never in production.
     fakeProvider: isTest || (!isProd && env.INTEGRATIONS_FAKE_PROVIDER === 'true'),
+    syncIntervalMs: env.INTEGRATION_SYNC_INTERVAL_MIN * 60_000,
+    backfillDays: env.INTEGRATION_BACKFILL_DAYS,
+    chunkBudget: { ms: env.INTEGRATION_SYNC_CHUNK_MS, requests: env.INTEGRATION_SYNC_CHUNK_REQUESTS },
+    rateLimitReserve: env.INTEGRATION_RATE_LIMIT_RESERVE,
   },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
     maxAttempts: env.JOB_MAX_ATTEMPTS,
     backoffBaseMs: env.JOB_BACKOFF_BASE_MS,
     staleAfterMs: env.JOB_STALE_AFTER_MS,
+    workerTypes: env.WORKER_JOB_TYPES,
   },
 };
