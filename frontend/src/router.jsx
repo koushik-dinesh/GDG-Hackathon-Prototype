@@ -4,7 +4,10 @@ import { ProtectedRoute } from './auth/ProtectedRoute.jsx';
 import { AppShell } from './components/AppShell.jsx';
 import { AcceptInvitationPage } from './pages/AcceptInvitation.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
+import { IntegrationSetupPage } from './pages/IntegrationSetup.jsx';
 import { AdminDashboard } from './pages/admin/Dashboard.jsx';
+import { IntegrationDetailPage } from './pages/admin/IntegrationDetail.jsx';
+import { IntegrationsPage } from './pages/admin/Integrations.jsx';
 import { MeetingDetailPage } from './pages/admin/MeetingDetail.jsx';
 import { MeetingNewPage } from './pages/admin/MeetingNew.jsx';
 import { MeetingsPage } from './pages/admin/Meetings.jsx';
@@ -50,6 +53,10 @@ export const router = createBrowserRouter([
               { path: '/admin/meetings/new', element: <MeetingNewPage /> },
               { path: '/admin/meetings/:id', element: <MeetingDetailPage /> },
               { path: '/admin/users', element: <UsersPage /> },
+              { path: '/admin/integrations', element: <IntegrationsPage /> },
+              { path: '/admin/integrations/:id', element: <IntegrationDetailPage /> },
+              // Where a provider sends the admin back after authorizing (e.g. GitHub's Setup URL).
+              { path: '/integrations/:provider/setup', element: <IntegrationSetupPage /> },
             ],
           },
           {

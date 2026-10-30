@@ -8,6 +8,7 @@ const NAV = {
     { to: '/projects', label: 'Projects' },
     { to: '/teams', label: 'Teams' },
     { to: '/admin/users', label: 'Users' },
+    { to: '/admin/integrations', label: 'Integrations' },
   ],
   manager: [
     { to: '/projects', label: 'Projects' },
