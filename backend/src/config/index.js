@@ -111,6 +111,10 @@ const schema = z.object({
   INTEGRATION_SYNC_CHUNK_REQUESTS: z.coerce.number().int().min(1).max(1000).default(10),
   // Pause a connection when fewer provider requests than this remain in its rate-limit window.
   INTEGRATION_RATE_LIMIT_RESERVE: z.coerce.number().int().min(0).default(200),
+  // Largest webhook body accepted (GitHub sends up to 25 MB; bigger changes arrive via sync).
+  WEBHOOK_MAX_BYTES: z.coerce.number().int().min(1024).max(25 * 1024 * 1024).default(10 * 1024 * 1024),
+  // Webhook payloads are kept this many days (for retries and replay), then deleted.
+  WEBHOOK_PAYLOAD_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
 
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
@@ -232,6 +236,8 @@ export const config = {
     backfillDays: env.INTEGRATION_BACKFILL_DAYS,
     chunkBudget: { ms: env.INTEGRATION_SYNC_CHUNK_MS, requests: env.INTEGRATION_SYNC_CHUNK_REQUESTS },
     rateLimitReserve: env.INTEGRATION_RATE_LIMIT_RESERVE,
+    webhookMaxBytes: env.WEBHOOK_MAX_BYTES,
+    webhookRetentionDays: env.WEBHOOK_PAYLOAD_RETENTION_DAYS,
   },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,

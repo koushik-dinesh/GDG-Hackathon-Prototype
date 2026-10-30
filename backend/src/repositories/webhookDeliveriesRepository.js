@@ -78,6 +78,27 @@ export async function listForConnection(connectionId, { status, limit = 50 } = {
   return rows.map(toDelivery);
 }
 
+/** Status changes made while processing. `fields` may set connection, job, error and attempts. */
+export async function setStatus(conn, id, status, { error, connectionId, jobId, countAttempt = false } = {}) {
+  const sets = ['status = ?'];
+  const params = [status];
+  if (error !== undefined) {
+    sets.push('last_error_message = ?');
+    params.push(error === null ? null : String(error).slice(0, 1000));
+  }
+  if (connectionId !== undefined) {
+    sets.push('connection_id = ?');
+    params.push(connectionId);
+  }
+  if (jobId !== undefined) {
+    sets.push('job_id = ?');
+    params.push(jobId);
+  }
+  if (countAttempt) sets.push('attempts = attempts + 1');
+  if (status === 'processed' || status === 'ignored') sets.push('processed_at = NOW()');
+  await conn.execute(`UPDATE webhook_deliveries SET ${sets.join(', ')} WHERE id = ?`, [...params, id]);
+}
+
 /** Retention: drops payloads older than `days`. Metadata stays for the delivery history. */
 export async function purgePayloadsOlderThan(days, conn = pool) {
   const [result] = await conn.execute(

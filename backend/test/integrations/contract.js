@@ -102,6 +102,10 @@ export function describeConnector(connector, fixtures) {
         const result = await connector.handleWebhook(fixtures.makeCtx(connection), { ...parsed, payload: body });
         assert.ok(Array.isArray(result.envelopes));
         for (const e of result.envelopes) assert.ok(ENVELOPE_TYPES.includes(e.type));
+        if (result.envelopes.length) {
+          assert.equal(typeof result.resourceRef?.resourceType, 'string', 'envelopes come with the resource they belong to');
+          assert.equal(typeof result.resourceRef?.externalId, 'string');
+        }
       });
     }
 

@@ -1,6 +1,8 @@
 import { aiExtract } from './aiExtract.js';
 import { emailSend } from './emailSend.js';
+import { integrationMaintenance } from './integrationMaintenance.js';
 import { integrationSync } from './integrationSync.js';
+import { integrationWebhook } from './integrationWebhook.js';
 import { vexaPoll } from './vexaPoll.js';
 
 // Job type -> handler. (Transcript fetching is part of 'vexa.poll'.)
@@ -9,6 +11,8 @@ export const handlers = {
   'email.send': emailSend,
   'vexa.poll': vexaPoll,
   'integration.sync': integrationSync,
+  'integration.webhook': integrationWebhook,
+  'integration.maintenance': integrationMaintenance,
 };
 
 /** The handlers this worker runs: all, or only those listed in WORKER_JOB_TYPES. */

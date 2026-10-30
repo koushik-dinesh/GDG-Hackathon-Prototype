@@ -8,6 +8,7 @@ import { connectionService, toAppError } from '../services/integrations/connecti
 import { registry } from '../services/integrations/registry.js';
 import * as scheduler from '../services/integrations/scheduler.js';
 import { vault } from '../services/integrations/vault.js';
+import { webhookService } from '../services/integrations/webhooks.js';
 import { conflict, notFound } from '../utils/errors.js';
 
 // Provider and credential failures become API errors with safe messages.
@@ -83,6 +84,11 @@ export const syncNow = handle(async (req, res) => {
 
 export const disconnect = handle(async (req, res) => {
   res.json({ connection: await connectionService.disconnect(req.params.id, req.body, actorOf(req)) });
+});
+
+// Re-queues a stored delivery (e.g. after fixing a mapping); 409 once its payload is purged.
+export const replayDelivery = handle(async (req, res) => {
+  res.status(202).json({ delivery: await webhookService.replay(req.params.id, actorOf(req)) });
 });
 
 export const listDeliveries = handle(async (req, res) => {

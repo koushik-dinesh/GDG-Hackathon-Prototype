@@ -42,6 +42,20 @@ export async function tick({ limit = 50 } = {}) {
   return queued;
 }
 
+/**
+ * Queues retention housekeeping unless it is already queued. The worker calls this every few
+ * hours; the job is idempotent, so an extra run from a second worker is harmless.
+ */
+export async function enqueueMaintenance() {
+  try {
+    await queue.enqueue('integration.maintenance', {}, { dedupeKey: 'integration.maintenance' });
+    return true;
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') return false;
+    throw err;
+  }
+}
+
 /** "Sync now" for a connection: queues every enabled resource regardless of next_sync_at. */
 export async function syncConnectionNow(connectionId) {
   let queued = 0;

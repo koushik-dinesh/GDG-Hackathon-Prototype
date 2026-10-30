@@ -208,7 +208,10 @@ export default {
       return { envelopes: [], lifecycle: status ? { status } : undefined };
     }
     if (eventType === 'item' && payload?.item && payload?.resource) {
-      return { envelopes: itemEnvelopes(payload.resource, payload.item, 'webhook') };
+      return {
+        envelopes: itemEnvelopes(payload.resource, payload.item, 'webhook'),
+        resourceRef: { resourceType: 'repository', externalId: String(payload.resource.externalId) },
+      };
     }
     return { envelopes: [] };
   },

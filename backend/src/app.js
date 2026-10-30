@@ -3,6 +3,7 @@ import express from 'express';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { apiRouter } from './routes/index.js';
 import { TRANSCRIPT_UPLOAD_PATH } from './routes/meetings.js';
+import { WEBHOOK_PATH } from './routes/webhooks.js';
 import { logger, redactUrl } from './utils/logger.js';
 
 export function createApp() {
@@ -19,9 +20,10 @@ export function createApp() {
     });
     next();
   });
-  // Transcript uploads are parsed by their own route (after auth) with a larger limit.
+  // Transcript uploads are parsed by their own route (after auth) with a larger limit. Webhooks
+  // keep their raw body: the signature is computed over the exact bytes.
   const json = express.json({ limit: '100kb' });
-  app.use((req, res, next) => (TRANSCRIPT_UPLOAD_PATH.test(req.path) ? next() : json(req, res, next)));
+  app.use((req, res, next) => (TRANSCRIPT_UPLOAD_PATH.test(req.path) || WEBHOOK_PATH.test(req.path) ? next() : json(req, res, next)));
   app.use(cookieParser());
 
   app.use((req, res, next) => {

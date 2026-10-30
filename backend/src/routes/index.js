@@ -11,6 +11,7 @@ import { projectsRouter } from './projects.js';
 import { tasksRouter } from './tasks.js';
 import { teamsRouter } from './teams.js';
 import { usersRouter } from './users.js';
+import { webhooksRouter } from './webhooks.js';
 
 // Mounted at /api/v1. Admin-only routers sit behind requireAuth + requireRole('admin').
 export const apiRouter = Router();
@@ -25,6 +26,8 @@ apiRouter.use('/action-items', ...adminOnly, actionItemsRouter);
 apiRouter.use('/emails', ...adminOnly, emailsRouter);
 // Integrations (Phase 3A): connecting external applications is admin-only.
 apiRouter.use('/integrations', ...adminOnly, integrationsRouter);
+// Inbound provider webhooks: public, verified by signature (services/integrations/webhooks.js).
+apiRouter.use('/webhooks', webhooksRouter);
 // The signed-in user's own tasks (employee portal). Not admin-only, but always scoped to req.user.
 apiRouter.use('/me/tasks', requireAuth, tasksRouter);
 // Projects and teams (Phase 2): any signed-in user; per-resource permissions in the controllers.

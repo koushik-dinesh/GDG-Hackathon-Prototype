@@ -18,7 +18,9 @@
 //                                            -> { envelopes, cursor, phase, done }
 //   webhooks: verifyWebhook({ headers, rawBody })   -> boolean
 //             parseWebhook({ headers, body })       -> { deliveryId, eventType, action?, externalAccountId? }
-//             handleWebhook(ctx, delivery)          -> { envelopes, lifecycle? }
+//             handleWebhook(ctx, delivery)          -> { envelopes, resourceRef?: { resourceType, externalId },
+//                                                        lifecycle?: { status: 'active'|'suspended'|'disconnected' } }
+//                                                      (envelopes are only written for an enabled resourceRef)
 // }
 //
 // ctx (built by the framework): { connection, resource?, http, credentials: { get(kind) }, logger, signal }

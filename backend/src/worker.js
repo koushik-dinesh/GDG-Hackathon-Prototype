@@ -14,6 +14,7 @@ import { logger } from './utils/logger.js';
 const workerId = `${hostname()}:${process.pid}`.slice(0, 64);
 const RECOVER_EVERY_MS = 60_000;
 const SCHEDULE_EVERY_MS = 60_000;
+const MAINTENANCE_EVERY_MS = 6 * 60 * 60 * 1000;
 // WORKER_JOB_TYPES lets a deployment dedicate workers (e.g. one only for integrations).
 const handlers = handlersFor(config.jobs.workerTypes);
 let stopping = false;
@@ -44,6 +45,8 @@ async function main() {
 
   let lastRecover = 0;
   let lastSchedule = 0;
+  let lastMaintenance = 0;
+  const runsMaintenance = Boolean(handlers['integration.maintenance']);
   while (!stopping) {
     try {
       if (Date.now() - lastRecover > RECOVER_EVERY_MS) {
@@ -55,6 +58,10 @@ async function main() {
         const queued = await scheduler.tick();
         if (queued) logger.info('integration syncs queued', { queued });
         lastSchedule = Date.now();
+      }
+      if (runsMaintenance && Date.now() - lastMaintenance > MAINTENANCE_EVERY_MS) {
+        await scheduler.enqueueMaintenance();
+        lastMaintenance = Date.now();
       }
       const didWork = await processNext(workerId, handlers);
       if (!didWork) await sleep(config.jobs.pollIntervalMs);

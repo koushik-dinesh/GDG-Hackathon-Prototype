@@ -51,6 +51,7 @@ integrationsRouter.get('/', validate({ query: listQuery }), ctrl.list);
 integrationsRouter.post('/:provider/connect', validate({ params: providerParams }), ctrl.startConnect);
 integrationsRouter.post('/:provider/callback', validate({ params: providerParams, body: callbackSchema }), ctrl.completeConnect);
 
+integrationsRouter.post('/webhook-deliveries/:id/replay', validate({ params: idParams }), ctrl.replayDelivery);
 integrationsRouter.get('/:id', validate({ params: idParams }), ctrl.get);
 integrationsRouter.patch('/:id', validate({ params: idParams, body: updateSchema }), ctrl.update);
 integrationsRouter.post('/:id/sync', validate({ params: idParams }), ctrl.syncNow);
