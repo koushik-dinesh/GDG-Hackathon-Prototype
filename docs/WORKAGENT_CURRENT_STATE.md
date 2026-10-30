@@ -1,5 +1,22 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 3A integration framework complete (2026-10-30, after the 2.5 note below).**
+> - **Migrations:** 005 (integration framework) and 006 (work records). The dev DB is at 006, with backups in `backups/`.
+> - **Backend** (`services/integrations/`):
+>   - encrypted credential vault (AES-256-GCM, key rotation);
+>   - provider registry and connector contract;
+>   - same-origin HTTP client;
+>   - sync engine (bounded chunks, cursors, rate-limit pause), scheduler, `WORKER_JOB_TYPES`;
+>   - signed webhook intake with redelivery, replay and retention;
+>   - idempotent, stale-safe ingest;
+>   - read APIs (`/external-records`, `/activities`, `/record-links`) with project visibility;
+>   - identity matching;
+>   - admin API under `/integrations`.
+> - **Frontend:** Admin → Integrations (list, connect, setup callback, connection detail).
+> - **Tests:** backend **410/410** (126 new in Phase 3A, including a secret-leak regression across responses, logs, jobs, audit rows and stored rows), frontend **87/87**, build OK.
+> - **Browser check:** test DB, fake provider. Connect, map, enable, sync and a signed webhook all worked; a forged webhook was refused.
+> - **Not yet:** any real provider. GitHub is Phase 3B. The Cloudflare Tunnel path has not been exercised.
+
 > **Update — Phase 2.5 closeout done (2026-10-30, later the same day).** This supersedes the matching rows below:
 > - Phase 1 and Phase 2 are committed on branch `phase-2-work-management` (`d9c4139`, `60b487e`); 2.5 is committed on top.
 > - The dev DB was backed up to `backups/meeting_action-pre-004-20261030-204126.sql` (gitignored), then migrated to 004. Existing data is intact (11 users, 9 items before verification).

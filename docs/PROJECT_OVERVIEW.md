@@ -376,3 +376,22 @@ Not verified: delivery to a real inbox or via Resend (Mailpit only); the migrati
 ### 14.6 Final test run (2026-10-28)
 - `cd backend && npm test`: **285 tests, 285 pass, 0 fail, 0 skipped** (217 existing, unchanged and passing + 68 new in `sessions`, `invitations`, `projects`, `teams` test files).
 - `cd frontend && npm test`: **77/77 pass**; `npm run build`: OK.
+
+---
+
+## 15. Phase 3A — integration framework & core data architecture (2026-10-30)
+
+Implemented as planned in `docs/PHASE_3A_PLAN.md` (the deviations are listed at its top). Operations: `docs/runbooks/integrations.md`. Rollback: `docs/runbooks/rollback-005-006.sql` (dry-run verified on a scratch database).
+
+- **Schema:** migrations `005_integrations.sql` (connections, encrypted credentials, connect states, resources, sync cursors, webhook deliveries) and `006_work_records.sql` (external identities, external records, activities, record links). Additive only, no tenant columns.
+- **Backend:**
+  - `services/integrations/`: crypto/vault, registry/contract, http, connections, sync, scheduler, webhooks, ingest, envelopes, links.
+  - Job types `integration.sync`, `integration.webhook` and `integration.maintenance`.
+  - Fake provider for tests and local demos.
+- **API:**
+  - admin `/integrations/*`;
+  - public `POST /webhooks/:provider`;
+  - signed-in `/external-records`, `/activities`, `/record-links`.
+- **Frontend:** Admin → Integrations, connection detail, `/integrations/:provider/setup`.
+- **Tests:** backend 410/410, frontend 87/87.
+- **Next:** Phase 3B, the GitHub connector.

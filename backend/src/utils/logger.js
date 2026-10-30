@@ -2,7 +2,13 @@ import { config } from '../config/index.js';
 
 // Minimal structured (JSON lines) logger. Swap for pino later if needed.
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
-const threshold = LEVELS[config.logLevel];
+let threshold = LEVELS[config.logLevel];
+
+/** Tests only: the suite runs at 'error'; the secret-leak test needs every log line. */
+export function setLogLevelForTests(level) {
+  if (!config.isTest) throw new Error('setLogLevelForTests is only for the test suite');
+  threshold = LEVELS[level];
+}
 
 // Field names whose values are never written to logs, at any depth. Masking by name is a safety
 // net: callers still must not log secrets, tokens, payloads or provider responses.

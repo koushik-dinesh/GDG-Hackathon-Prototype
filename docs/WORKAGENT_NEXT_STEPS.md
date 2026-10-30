@@ -1,5 +1,16 @@
 # WorkAgent — Next Steps (2026-10-30)
 
+> **Update (end of 2026-10-30): Phase 3A is complete.** It was built as planned in `docs/PHASE_3A_PLAN.md` (the deviations are listed at the top of that file) and is operated per `docs/runbooks/integrations.md`.
+> - Tests: backend 410/410, frontend 87/87, build OK.
+> - Verified in the browser on the test DB with the fake provider.
+> - The dev DB is migrated to 006.
+>
+> **Next: Phase 3B, the GitHub connector** (acceptance criteria below, "Phase 3B"). It needs from you:
+> - a private GitHub App on your account or org, with the permissions and events in `PHASE_3A_PLAN.md` §11;
+> - the App ID, slug, private key and webhook secret;
+> - the public Cloudflare Tunnel hostname, routed to `/api/v1/webhooks/` only;
+> - a test repository.
+
 **Next phase: Phase 2.5 (closeout, prerequisite) → Phase 3A (integration framework + normalized record core).**
 Phase 3B (GitHub connector) follows immediately on top of 3A.
 

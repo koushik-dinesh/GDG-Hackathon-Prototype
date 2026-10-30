@@ -1,6 +1,16 @@
 # Phase 3A — Integration Framework & Core Data Architecture (implementation plan)
 
-Status: **PLAN — awaiting approval.** Nothing in this document has been implemented. Branch: `phase-2-work-management`.
+Status: **IMPLEMENTED (2026-10-30)**, steps 1–10 committed on `phase-2-work-management` (`a6c63c4` … step 10). Operations guide: `docs/runbooks/integrations.md`.
+
+**Deviations from this plan, as built:**
+- `integration_sync_cursors.cursor` is named `cursor_state` (`CURSOR` is a reserved word in MySQL).
+- `activities.external_record_id` has a plain foreign key, with no `ON DELETE` action. MySQL forbids referential actions on columns used in a CHECK, and records are never deleted.
+- Duplicate detection uses `ER_DUP_ENTRY`, not `affectedRows`. mysql2 sets `FOUND_ROWS`, so a no-op `ON DUPLICATE KEY` reports 1, the same as an insert.
+- Configuration was added in the step that uses it, not all in step 1.
+- "Refresh resources" runs in the request, not as an `integration.connection` job. There is no periodic provider health-check job; health comes from sync and webhook outcomes.
+- Two endpoints were added in step 8, which the data model needed: `PUT /external-records/:id/project` (a manual move, which locks the record) and identity matching (`GET/PATCH /integrations/identities`).
+- `handleWebhook()` returns `resourceRef` with its envelopes. Envelopes are only written for an enabled resource, so webhooks cannot bypass opt-in sync.
+- Maintenance runs every 6 hours under a single dedupe key, not once a day per date.
 Inputs: `WORKAGENT_CURRENT_STATE.md`, `WORKAGENT_MASTER_ROADMAP.md`, `WORKAGENT_NEXT_STEPS.md`, and a source audit of `backend/src` on 2026-10-30.
 Fixed decisions: GitHub App auth · existing Cloudflare Tunnel for dev webhooks · an encryption key per deployment, held in an environment variable · MySQL 8.4 · Express 5 · separate worker · MySQL job queue · no new npm dependencies.
 
