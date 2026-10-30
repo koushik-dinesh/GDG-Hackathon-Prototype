@@ -35,7 +35,12 @@ export async function resetDatabase() {
   await pool.query('DELETE FROM meetings'); // cascades to participants, transcripts, segments, runs, items
   await pool.query('DELETE FROM jobs');
   await pool.query('DELETE FROM audit_logs');
-  // Integrations (Phase 3A): resources reference connections and projects without cascading.
+  // Integrations (Phase 3A): records/activities and resources reference connections and projects
+  // without cascading, so they go first (children before parents).
+  await pool.query('DELETE FROM record_links');
+  await pool.query('DELETE FROM activities');
+  await pool.query('DELETE FROM external_records');
+  await pool.query('DELETE FROM external_identities');
   await pool.query('DELETE FROM webhook_deliveries');
   await pool.query('DELETE FROM integration_resources'); // cascades to sync cursors
   await pool.query('DELETE FROM integration_connections'); // cascades to credentials, auth states

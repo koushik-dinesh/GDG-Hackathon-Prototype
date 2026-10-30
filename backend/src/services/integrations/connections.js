@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { pool } from '../../db/pool.js';
 import { withTransaction } from '../../db/transaction.js';
 import * as authStates from '../../repositories/integrationAuthStatesRepository.js';
+import * as records from '../../repositories/externalRecordsRepository.js';
 import * as connections from '../../repositories/integrationConnectionsRepository.js';
 import * as resources from '../../repositories/integrationResourcesRepository.js';
 import * as projects from '../../repositories/projectsRepository.js';
@@ -229,13 +230,15 @@ export function createConnectionService({ registry = defaultRegistry } = {}) {
         nextSyncAt: isEnabled && !before.isEnabled ? new Date() : undefined,
       });
       const after = await resources.findById(resourceId, { conn });
+      // Records that follow the resource (not moved by hand) move with it, with their activities.
+      const moved = after.projectId !== before.projectId ? await records.reassignResourceProject(conn, resourceId, after.projectId) : null;
       await recordAudit(conn, {
         actorUserId: actor.id,
         action: 'integration.resource_updated',
         entityType: 'integration_resource',
         entityId: resourceId,
         before: { isEnabled: before.isEnabled, projectId: before.projectId },
-        after: { isEnabled: after.isEnabled, projectId: after.projectId },
+        after: { isEnabled: after.isEnabled, projectId: after.projectId, ...(moved && { movedRecords: moved.records, movedActivities: moved.activities }) },
         ip,
       });
       return after;
