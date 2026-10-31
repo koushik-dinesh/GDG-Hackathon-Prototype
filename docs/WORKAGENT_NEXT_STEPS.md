@@ -1,5 +1,7 @@
 # WorkAgent — Next Steps (2026-10-31)
 
+> **Phase 10 notifications are complete (`docs/PHASE_10_NOTIFICATIONS.md`). Next: Phase 11 production readiness.** Live connector verification needs provider credentials. Automation policies and the approval queue wait for Phase 6 and connectors with write access.
+
 > **Phase 7 (insights) is complete. Next: the remaining connectors** — Jira, Microsoft Teams, Outlook, Google Meet and Figma on the Phase 3A provider framework, each tested against a local fake of its API, with the exact external configuration documented. Then the operations center (Phase 8), notifications (Phase 10) and production readiness (Phase 11).
 
 > **Phase 5 (correlation) is complete. Next: the intelligence and insights engine.**

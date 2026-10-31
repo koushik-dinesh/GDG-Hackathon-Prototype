@@ -16,6 +16,7 @@ export const RETRYABLE = {
   'integration.sync': (p) => `integration.sync:res:${p.resourceId}`,
   'integration.maintenance': () => 'integration.maintenance',
   'correlation.evaluate': (p) => `correlation:${p.type}:${p.id}`,
+  'notifications.scan': () => 'notifications.scan',
 };
 const DOMAIN_ACTION = {
   'email.send': 'Retry the e-mail from the E-mail tab (it also resets the message status).',

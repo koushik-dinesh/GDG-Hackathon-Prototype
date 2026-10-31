@@ -1,4 +1,4 @@
-# WorkAgent — Master Roadmap (updated 2026-10-30)
+# WorkAgent — Master Roadmap (updated 2026-10-31)
 
 Baseline: the original 11-phase roadmap. Status below is from the repository assessment in `docs/WORKAGENT_CURRENT_STATE.md`. Effort figures are **engineering estimates**, not measured completion. Single-company deployment is a hard constraint for every phase (no tenant IDs, tenant switching, self-service org signup or shared customer DBs).
 
@@ -19,10 +19,10 @@ Status legend: **Complete** · **Complete (uncommitted)** · **Partial** · **No
 | 7 | Intelligence dashboard | **Complete** (2026-10-31) | `GET /api/v1/insights`: project health, overdue, blockers/dependencies, review progress, follow-through, workload, stalled work, trends; facts vs labelled inferences; role-scoped; admin dashboard + `/insights`; 497 backend / 106 frontend tests; browser-verified for 3 roles | Configurable thresholds; caching if data grows |
 | 8 | Ops center | **Complete** (2026-10-31) | `/admin/operations`: queue summary, jobs with safe retry/cancel (dead letters), audit log viewer, e-mail history, AI runs with tokens and configured-price cost; migration 009 | Live worker heartbeat table; alerting on dead jobs (Phase 10) |
 | 9 | Reliable sync | Partial (queue only) | Lease-safe MySQL queue, retries, dead state, dedupe, reschedule | Sync cursors, webhook ingestion, ordering, backfill, reconciliation, token refresh |
-| 10 | Notifications & automation | Partial (email only) | Explicit-confirmation action-item email with idempotency | Alerts, digests, policies, external writes |
+| 10 | Notifications & automation | **Notifications complete; automation deferred** (2026-10-31) | In-app notifications (assignment, overdue, blocked, daily digest, suggestions, integration and job failures), preferences, profile, password change; migration 010; live API/worker and browser checks. See `docs/PHASE_10_NOTIFICATIONS.md` | Automation policies, approval queue for external writes, permissions on AI-proposed external actions (need Phase 6 and write-scoped connectors); notifications for blocked synced records; email channel |
 | 11 | Security, production & device | Partial | Session revocation, bcrypt, zod, secrets in env, prompt-injection precautions | Deployment, HTTPS, backups, monitoring, secret encryption, retention; device workstream |
 
-Complete: Phases 1, 2, 3A, 4, 5 (correlation), 7 (insights), 8 (operations); connectors for GitHub, Jira, Teams, Outlook, Google Meet and Figma in code (none live-verified). Partial: 6, 9, 10, 11. Next: **Phase 10 notifications** and profile/preferences, then **Phase 11 production readiness**.
+Complete: Phases 1, 2, 3A, 4, 5 (correlation), 7 (insights), 8 (operations); connectors for GitHub, Jira, Teams, Outlook, Google Meet and Figma in code (none live-verified). Partial: 6, 9, 10 (automation deferred), 11. Next: **Phase 11 production readiness**.
 
 ---
 
@@ -93,10 +93,11 @@ Complete: Phases 1, 2, 3A, 4, 5 (correlation), 7 (insights), 8 (operations); con
 - **Existing:** reviewed, explicitly confirmed, idempotent email sending.
 - **Remaining:** notification rules (overdue, blocker, digest), in-app notifications, automation policies table, approval queue for external writes (Jira create, GitHub assign), backend-enforced permissions on every AI-proposed action.
 - **Dependencies:** 5, 6, connectors with write scopes.
+- **Update 2026-10-31:** notification rules for tasks (overdue, blocked, digest) and in-app notifications are done; see `docs/PHASE_10_NOTIFICATIONS.md`, which also records why each other item is deferred. Still open: automation policies, approval queue, permissions on AI-proposed external actions, notifications for blocked synced records, an email channel.
 
 ## Phase 11 — Security, Production Readiness & Meeting Device
 - **Existing:** bcrypt, revocable sessions, httpOnly cookies, zod, parameterised SQL, secret isolation, prompt-injection rules, audit.
-- **Remaining:** deployment packaging (Docker images for API/worker/SPA, reverse proxy + HTTPS), `trust proxy`, persistent rate limiting, backups/restore runbook, structured logging + error reporting, credential encryption key rotation, data retention, dependency scanning, install/upgrade docs per customer, password reset (if not in 2.5), product rename (cookie/DB names).
+- **Remaining:** deployment packaging (Docker images for API/worker/SPA, reverse proxy + HTTPS), `trust proxy`, persistent rate limiting, backups/restore runbook, structured logging + error reporting, credential encryption key rotation, data retention (including notifications), dependency scanning, install/upgrade docs per customer, password reset (if not in 2.5), product rename (cookie/DB names).
 - **Device:** separate hardware workstream; only dependency on the platform is an authenticated upload API for audio/transcripts (can reuse the transcript upload + Vexa JSON format).
 
 ---

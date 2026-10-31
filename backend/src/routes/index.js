@@ -7,6 +7,7 @@ import { emailsRouter } from './emails.js';
 import { healthRouter } from './health.js';
 import { insightsRouter } from './insights.js';
 import { integrationsRouter } from './integrations.js';
+import { meRouter } from './me.js';
 import { meetingsRouter } from './meetings.js';
 import { opsRouter } from './ops.js';
 import { projectsRouter } from './projects.js';
@@ -44,6 +45,8 @@ apiRouter.use('/insights', requireAuth, insightsRouter);
 apiRouter.use('/webhooks', webhooksRouter);
 // The signed-in user's own tasks (employee portal). Not admin-only, but always scoped to req.user.
 apiRouter.use('/me/tasks', requireAuth, tasksRouter);
+// The signed-in person's profile, password, preferences and notifications (Phase 10).
+apiRouter.use('/me', requireAuth, meRouter);
 // Projects and teams (Phase 2): any signed-in user; per-resource permissions in the controllers.
 apiRouter.use('/projects', requireAuth, projectsRouter);
 apiRouter.use('/teams', requireAuth, teamsRouter);

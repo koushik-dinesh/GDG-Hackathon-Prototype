@@ -410,3 +410,7 @@ Run this against a real App and a test repository. Live verification has **not**
 2. Comment in a file; with webhooks the comment appears within seconds, otherwise at the next sync.
 3. Delete a file; it shows *deleted* after the webhook or next sync.
 4. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.
+
+## 15. Failure notifications
+
+Admins get an in-app notification, at most daily per connection, when a sync finds credentials unreadable, the provider rejects them (`auth`), the installation is suspended, or another permanent provider error occurs (for example missing permissions). It links to the connection page. Transient errors and rate limits stay quiet unless the job finally goes dead, which the hourly `notifications.scan` reports to admins. See `docs/PHASE_10_NOTIFICATIONS.md`.

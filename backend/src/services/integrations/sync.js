@@ -20,6 +20,7 @@ import { buildContext } from './context.js';
 import { CredentialsUnreadableError } from './crypto.js';
 import { ProviderError } from './errors.js';
 import { ingest } from './ingest.js';
+import { notifyIntegrationError } from '../notifications/triggers.js';
 import { registry as defaultRegistry } from './registry.js';
 
 const OVERLAP_MS = 2 * 60 * 1000;
@@ -62,11 +63,14 @@ async function pauseConnection(connectionId, until) {
  * PermanentJobError or the original retryable error) or null when the job should just finish.
  */
 async function handleFailure(err, { connection, resource }) {
+  // Phase 10: admins hear about what only a person can fix. Never gets in the way of the failure handling.
+  const alertAdmins = (msg) => notifyIntegrationError(connection, msg).catch((e) => logger.error('integration notification failed', { error: e.message }));
   const resourceError = (msg) => resources.update(pool, resource.id, { lastErrorMessage: msg.slice(0, 500), nextSyncAt: later(config.integrations.syncIntervalMs) });
 
   if (err instanceof CredentialsUnreadableError) {
     await recordFailure(connection, Object.assign(err, { kind: 'credentials_unreadable', publicMessage: 'Stored credentials cannot be read; reconnect the integration' }), { status: 'error', health: 'failing' });
     await resourceError('Reconnect the integration: its stored credentials cannot be read');
+    await alertAdmins('Stored credentials cannot be read; reconnect the integration');
     return new PermanentJobError(err.message);
   }
   if (!(err instanceof ProviderError)) return err; // database or programming error: retry with backoff
@@ -80,9 +84,11 @@ async function handleFailure(err, { connection, resource }) {
     case 'auth':
       await recordFailure(connection, err, { status: 'error', health: 'failing' });
       await resourceError(err.publicMessage);
+      await alertAdmins(err.publicMessage);
       return new PermanentJobError(err.message, { publicMessage: err.publicMessage });
     case 'suspended':
       await connections.update(pool, connection.id, { status: 'suspended', lastErrorCode: 'suspended', lastErrorMessage: err.publicMessage });
+      await alertAdmins(err.publicMessage);
       return null;
     case 'not_found':
       await resources.update(pool, resource.id, { accessStatus: 'removed', lastErrorMessage: err.publicMessage });
@@ -90,6 +96,7 @@ async function handleFailure(err, { connection, resource }) {
     default:
       await recordFailure(connection, err);
       await resourceError(err.publicMessage);
+      await alertAdmins(err.publicMessage);
       return new PermanentJobError(err.message, { publicMessage: err.publicMessage });
   }
 }

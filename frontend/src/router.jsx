@@ -6,6 +6,8 @@ import { AcceptInvitationPage } from './pages/AcceptInvitation.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { ActivityFeedPage } from './pages/ActivityFeed.jsx';
 import { InsightsPage } from './pages/Insights.jsx';
+import { NotificationsPage } from './pages/Notifications.jsx';
+import { ProfilePage } from './pages/Profile.jsx';
 import { IntegrationSetupPage } from './pages/IntegrationSetup.jsx';
 import { RecordDetailPage } from './pages/RecordDetail.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
@@ -83,6 +85,9 @@ export const router = createBrowserRouter([
           { path: '/search', element: <SearchPage /> },
           // Phase 7: insights for what each person may see (the API scopes them by role).
           { path: '/insights', element: <InsightsPage /> },
+          // Phase 10: the signed-in person's own notifications, profile and preferences.
+          { path: '/notifications', element: <NotificationsPage /> },
+          { path: '/profile', element: <ProfilePage /> },
           // Phase 5: relationship suggestions to review (the API returns only what the person may decide).
           {
             element: <ProtectedRoute roles={['admin', 'manager']} />,

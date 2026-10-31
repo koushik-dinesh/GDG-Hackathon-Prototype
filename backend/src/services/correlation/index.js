@@ -106,13 +106,15 @@ export async function loadSubject(conn, { type, id }) {
  * Runs every matcher that applies to this subject and stores new suggestions. Pairs that already
  * have any relationship (confirmed, suggested or rejected by a person) are left alone. A record
  * deleted at the source gets no new suggestions and its pending ones are withdrawn (kept as
- * rejected, for history). Returns { suggested, withdrawn }.
+ * rejected, for history). Returns { suggested, withdrawn, projectPairs } ([from, to] project ids
+ * of each new suggestion).
  */
 export async function evaluate(conn, ref) {
   const subject = await loadSubject(conn, ref);
   if (!subject) return { suggested: 0, withdrawn: 0 };
   if (subject.deleted) return { suggested: 0, withdrawn: await links.withdrawSuggestions(conn, ref) };
   let suggested = 0;
+  const projectPairs = [];
   for (const m of [...BUILT_IN_MATCHERS, ...matchers]) {
     if (m.appliesTo && !m.appliesTo.includes(subject.type)) continue;
     for (const p of await m.run(conn, subject)) {
@@ -120,8 +122,11 @@ export async function evaluate(conn, ref) {
       if (from.type === p.to.type && from.id === p.to.id) continue;
       if (await links.anyBetween(conn, from, p.to)) continue;
       const stored = await suggestLink(conn, { from, to: p.to, linkType: p.linkType, confidence: p.confidence, method: p.method ?? 'rule', evidence: { matcher: m.id, ...(p.evidence ?? {}) } });
-      if (stored) suggested++;
+      if (stored) {
+        suggested++;
+        projectPairs.push([(await loadSubject(conn, from))?.projectId ?? null, (await loadSubject(conn, p.to))?.projectId ?? null]);
+      }
     }
   }
-  return { suggested, withdrawn: 0 };
+  return { suggested, withdrawn: 0, projectPairs };
 }

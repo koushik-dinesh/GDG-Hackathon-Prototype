@@ -1,5 +1,13 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 10 notifications complete; automation deferred (2026-10-31).** Details, scope decisions and limits: `docs/PHASE_10_NOTIFICATIONS.md`.
+> - In-app notifications for assignment, overdue, blocked tasks, a daily digest (9:00 in the person's time zone), suggestions, integration failures and failed jobs; per-kind preferences limited by role; profile; password change that ends other sessions.
+> - UI: `/notifications`, `/profile`, unread badge in the header.
+> - Migration `010_notifications.sql` applied to the dev DB after backup `backups/meeting_action-pre-010-20261031-095201.sql` (restored and compared; rollback rehearsed on a scratch copy). Procedure and log: `docs/runbooks/database-migrations.md`. The shared test DB stays at 009 until the next plain `npm test`.
+> - Tests: backend 617/617 on a disposable database (37 new), frontend 128/128 (18 new), build OK.
+> - Live checks: 44 through the real API and worker on the dev DB; 7 on provider failures on a scratch DB (fake provider, script using the real queue and handlers). Browser-verified as employee, manager and admin, including a 375px width.
+> - **Not done:** automation policies, approval queue for external writes, email channel, notification retention. No real provider has been exercised.
+
 > **Update: Phase 8 operations center complete (2026-10-31).** Implemented, tested and browser-verified (admin, test database).
 > - `GET /api/v1/ops/summary|jobs|audit|audit/actions|emails|ai-runs`, `POST /api/v1/ops/jobs/:id/retry|cancel` (admin-only; `services/ops.js`).
 > - Dead-letter handling: failed/dead jobs can be retried (fresh attempts, dedupe key restored, duplicates refused) and waiting jobs cancelled — only for job types whose re-run is safe (integration sync/maintenance, correlation). E-mail, extraction, webhook and bot jobs name their own retry action, which also resets their domain state. Every action is audited (`job.retried`, `job.cancelled`).

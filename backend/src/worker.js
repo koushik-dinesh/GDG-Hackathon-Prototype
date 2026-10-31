@@ -5,6 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { config } from './config/index.js';
 import { pool } from './db/pool.js';
 import { handlersFor } from './jobs/handlers/index.js';
+import * as queue from './jobs/queue.js';
 import { processNext, recover } from './jobs/runner.js';
 import { claude } from './services/ai/claudeClient.js';
 import { registry } from './services/integrations/registry.js';
@@ -15,6 +16,7 @@ const workerId = `${hostname()}:${process.pid}`.slice(0, 64);
 const RECOVER_EVERY_MS = 60_000;
 const SCHEDULE_EVERY_MS = 60_000;
 const MAINTENANCE_EVERY_MS = 6 * 60 * 60 * 1000;
+const NOTIFICATION_SCAN_EVERY_MS = 60 * 60 * 1000;
 // WORKER_JOB_TYPES lets a deployment dedicate workers (e.g. one only for integrations).
 const handlers = handlersFor(config.jobs.workerTypes);
 let stopping = false;
@@ -46,6 +48,8 @@ async function main() {
   let lastRecover = 0;
   let lastSchedule = 0;
   let lastMaintenance = 0;
+  let lastScan = 0;
+  const runsScan = Boolean(handlers['notifications.scan']);
   const runsMaintenance = Boolean(handlers['integration.maintenance']);
   while (!stopping) {
     try {
@@ -62,6 +66,13 @@ async function main() {
       if (runsMaintenance && Date.now() - lastMaintenance > MAINTENANCE_EVERY_MS) {
         await scheduler.enqueueMaintenance();
         lastMaintenance = Date.now();
+      }
+      if (runsScan && Date.now() - lastScan > NOTIFICATION_SCAN_EVERY_MS) {
+        // One pending scan at a time across workers (dedupe key).
+        await queue.enqueue('notifications.scan', {}, { dedupeKey: 'notifications.scan' }).catch((err) => {
+          if (err.code !== 'ER_DUP_ENTRY') throw err;
+        });
+        lastScan = Date.now();
       }
       const didWork = await processNext(workerId, handlers);
       if (!didWork) await sleep(config.jobs.pollIntervalMs);

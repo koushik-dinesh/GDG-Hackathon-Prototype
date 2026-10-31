@@ -444,7 +444,7 @@ cd backend
 npm test
 ```
 
-The test runner migrates the test database automatically. You can migrate it manually with `NODE_ENV=test npm run migrate`.
+The test runner migrates the test database automatically and wipes it; to leave it alone, set `DB_TEST_NAME` to a throwaway database (see `docs/runbooks/database-migrations.md`). You can migrate it manually with `NODE_ENV=test npm run migrate`.
 
 ---
 
