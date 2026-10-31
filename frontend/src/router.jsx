@@ -16,6 +16,7 @@ import { IntegrationsPage } from './pages/admin/Integrations.jsx';
 import { MeetingDetailPage } from './pages/admin/MeetingDetail.jsx';
 import { MeetingNewPage } from './pages/admin/MeetingNew.jsx';
 import { MeetingsPage } from './pages/admin/Meetings.jsx';
+import { OperationsPage } from './pages/admin/Operations.jsx';
 import { UsersPage } from './pages/admin/Users.jsx';
 import { MyTasks } from './pages/employee/MyTasks.jsx';
 import { TaskDetail } from './pages/employee/TaskDetail.jsx';
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
               { path: '/admin/users', element: <UsersPage /> },
               { path: '/admin/integrations', element: <IntegrationsPage /> },
               { path: '/admin/integrations/:id', element: <IntegrationDetailPage /> },
+              { path: '/admin/operations', element: <OperationsPage /> },
               // Where a provider sends the admin back after authorizing (e.g. GitHub's Setup URL).
               { path: '/integrations/:provider/setup', element: <IntegrationSetupPage /> },
             ],

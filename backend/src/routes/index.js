@@ -8,6 +8,7 @@ import { healthRouter } from './health.js';
 import { insightsRouter } from './insights.js';
 import { integrationsRouter } from './integrations.js';
 import { meetingsRouter } from './meetings.js';
+import { opsRouter } from './ops.js';
 import { projectsRouter } from './projects.js';
 import { tasksRouter } from './tasks.js';
 import { teamsRouter } from './teams.js';
@@ -26,6 +27,8 @@ apiRouter.use('/users', ...adminOnly, usersRouter);
 apiRouter.use('/meetings', ...adminOnly, meetingsRouter);
 apiRouter.use('/action-items', ...adminOnly, actionItemsRouter);
 apiRouter.use('/emails', ...adminOnly, emailsRouter);
+// Operations center (Phase 8): jobs, audit log, e-mail and AI history. Admin-only.
+apiRouter.use('/ops', ...adminOnly, opsRouter);
 // Integrations (Phase 3A): connecting external applications is admin-only.
 apiRouter.use('/integrations', ...adminOnly, integrationsRouter);
 // Synced work and the unified feed (Phase 3A/4): any signed-in user; visibility follows projects

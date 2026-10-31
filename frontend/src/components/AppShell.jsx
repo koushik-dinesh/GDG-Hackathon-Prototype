@@ -12,6 +12,7 @@ const NAV = {
     { to: '/teams', label: 'Teams' },
     { to: '/admin/users', label: 'Users' },
     { to: '/admin/integrations', label: 'Integrations' },
+    { to: '/admin/operations', label: 'Operations' },
   ],
   manager: [
     { to: '/insights', label: 'Insights' },
@@ -49,46 +50,47 @@ export function AppShell() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-6">
+        {/* Two rows so the navigation wraps instead of running off narrow screens. */}
+        <div className="mx-auto max-w-6xl px-4 pt-3">
+          <div className="flex items-center justify-between gap-4">
             <span className="font-semibold text-slate-900">Meeting to Action</span>
-            <nav className="flex gap-1">
-              {(NAV[user.role] ?? NAV.employee).map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:text-slate-900'}`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </nav>
+            <div className="flex items-center gap-3 text-sm">
+              <form onSubmit={search} role="search" className="hidden md:block">
+                <input
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search…"
+                  aria-label="Search WorkAgent"
+                  className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-slate-500 focus:outline-none"
+                />
+              </form>
+              <span className="hidden text-slate-600 sm:inline">
+                {user.fullName} · <span className="capitalize">{user.role}</span>
+              </span>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-50"
+              >
+                Log out
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <form onSubmit={search} role="search" className="hidden md:block">
-              <input
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search…"
-                aria-label="Search WorkAgent"
-                className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-slate-500 focus:outline-none"
-              />
-            </form>
-            <span className="hidden text-slate-600 sm:inline">
-              {user.fullName} · <span className="capitalize">{user.role}</span>
-            </span>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-slate-700 hover:bg-slate-50"
-            >
-              Log out
-            </button>
-          </div>
+          <nav className="-mx-3 mt-2 flex flex-wrap gap-1 pb-2">
+            {(NAV[user.role] ?? NAV.employee).map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `rounded-md px-3 py-1.5 text-sm ${isActive ? 'bg-slate-100 font-medium text-slate-900' : 'text-slate-600 hover:text-slate-900'}`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">

@@ -48,6 +48,10 @@ const schema = z.object({
   ANTHROPIC_MODEL: z.string().min(1).default('claude-opus-5-5'),
   ANTHROPIC_EFFORT: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).default('high'),
   ANTHROPIC_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(1024).max(128000).default(32000),
+  // Optional: USD per million tokens for the operations center's cost figures. Unset = tokens
+  // only (WorkAgent never guesses prices).
+  AI_PRICE_INPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1000).optional(),
+  AI_PRICE_OUTPUT_USD_PER_MTOK: z.coerce.number().min(0).max(1000).optional(),
   ANTHROPIC_TIMEOUT_MS: z.coerce.number().int().min(10_000).default(300_000),
   // Server-side refusal fallback (beta). Set to false to disable.
   ANTHROPIC_REFUSAL_FALLBACK: z.enum(['true', 'false']).default('true'),
@@ -392,6 +396,9 @@ export const config = {
         authUrl: env.FIGMA_AUTH_URL.replace(/\/+$/, ''),
         apiUrl: env.FIGMA_API_URL.replace(/\/+$/, ''),
       },
+  ops: {
+    aiPrice: env.AI_PRICE_INPUT_USD_PER_MTOK !== undefined && env.AI_PRICE_OUTPUT_USD_PER_MTOK !== undefined ? { input: env.AI_PRICE_INPUT_USD_PER_MTOK, output: env.AI_PRICE_OUTPUT_USD_PER_MTOK } : null,
+  },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
     maxAttempts: env.JOB_MAX_ATTEMPTS,

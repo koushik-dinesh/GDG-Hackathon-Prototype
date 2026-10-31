@@ -1,5 +1,13 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 8 operations center complete (2026-10-31).** Implemented, tested and browser-verified (admin, test database).
+> - `GET /api/v1/ops/summary|jobs|audit|audit/actions|emails|ai-runs`, `POST /api/v1/ops/jobs/:id/retry|cancel` (admin-only; `services/ops.js`).
+> - Dead-letter handling: failed/dead jobs can be retried (fresh attempts, dedupe key restored, duplicates refused) and waiting jobs cancelled — only for job types whose re-run is safe (integration sync/maintenance, correlation). E-mail, extraction, webhook and bot jobs name their own retry action, which also resets their domain state. Every action is audited (`job.retried`, `job.cancelled`).
+> - Audit log viewer (filters by action or action prefix, actor, entity, dates; keyset paging; before/after on demand), e-mail delivery history with retry (no bodies), AI extraction runs with tokens, duration and errors (no model output). AI cost is shown only when `AI_PRICE_INPUT_USD_PER_MTOK`/`AI_PRICE_OUTPUT_USD_PER_MTOK` are set — prices are never assumed.
+> - UI: `/admin/operations` (Overview, Jobs, Audit log, E-mail, AI usage). The app header now wraps its navigation on narrow screens.
+> - Migration `009_operations_center.sql` (indexes only). Dev DB migrated after backup `backups/meeting_action-pre-009-20261031-071203.sql` (145,773 bytes, verified complete); rollback `docs/runbooks/rollback-009.sql`.
+> - Tests: backend 580/580 (7 new), frontend 110/110 (4 new), build OK.
+
 > **Update: Microsoft Teams, Outlook, Google Meet and Figma connectors implemented (2026-10-31). None live-verified** (no provider credentials available).
 > - Teams/Outlook (Microsoft Graph, one Entra app, delegated OAuth, delta sync, deletions as tombstones; no change notifications), Google Meet (Workspace OAuth, Meet events by sync token, conference records; no push), Figma (OAuth, files/comments/versions, deleted-file detection, passcode webhooks treated as nudges).
 > - Tests against local fakes: Teams+Outlook 25, Google Meet 14, Figma 15 (each with the shared contract suite and an API → sync engine end-to-end test). Backend 573/573.
