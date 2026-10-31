@@ -82,11 +82,13 @@ export function createHttpClient({ baseUrl, authorize, classify, timeoutMs = DEF
    * Returns { status, headers, body, links, rateLimit }. body is parsed JSON (or null for 204/304,
    * or text when the response isn't JSON). Throws ProviderError for failures.
    */
-  async function request(method, pathOrUrl, { query, body, headers: extra, okStatuses = [] } = {}) {
+  async function request(method, pathOrUrl, { query, body, form, headers: extra, okStatuses = [] } = {}) {
     const url = resolve(pathOrUrl, query);
     const path = url.pathname;
     const headers = new Headers({ Accept: 'application/json', ...defaultHeaders, ...extra });
     if (body !== undefined) headers.set('Content-Type', 'application/json');
+    // `form`: an application/x-www-form-urlencoded body (OAuth token endpoints).
+    if (form !== undefined) headers.set('Content-Type', 'application/x-www-form-urlencoded');
     if (authorize) await authorize(headers);
 
     requests++;
@@ -96,7 +98,7 @@ export function createHttpClient({ baseUrl, authorize, classify, timeoutMs = DEF
       res = await fetchImpl(url, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: form !== undefined ? new URLSearchParams(Object.entries(form).filter(([, v]) => v !== undefined && v !== null)).toString() : body === undefined ? undefined : JSON.stringify(body),
         signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
         redirect: 'manual',
       });
@@ -133,6 +135,7 @@ export function createHttpClient({ baseUrl, authorize, classify, timeoutMs = DEF
     request,
     get: (path, opts) => request('GET', path, opts),
     post: (path, body, opts) => request('POST', path, { ...opts, body }),
+    postForm: (path, form, opts) => request('POST', path, { ...opts, form }),
     /** { requests, rateLimit } for the sync engine and connection health. */
     stats: () => ({ requests, rateLimit: lastRateLimit }),
   };

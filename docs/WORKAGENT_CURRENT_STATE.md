@@ -1,5 +1,11 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Jira Cloud connector implemented (2026-10-31). Not live-verified** (no Atlassian credentials available).
+> - OAuth 2.0 (3LO) connect with site check and offline access, rotating refresh tokens in the vault, JQL sync (open issues of any age + `updated` incremental in the API user's time zone, page tokens, extra comments), issue links (blocks/duplicates/related/sub-tasks), people, signed webhooks (`X-Hub-Signature`, deduplicated by `X-Atlassian-Webhook-Identifier`), deletions kept as deleted, revoked grants → needs reconnect.
+> - Shared OAuth helper (`providers/oauth2.js`), `form` bodies in the HTTP client, `ctx.credentials.peek()`; integration callback accepts parameters up to 4,096 characters.
+> - Tested against a local fake Atlassian (`test/jira.test.js`, 22 tests incl. the contract suite and API → sync engine → webhook worker end to end). Browser-verified against the fake: Connect → consent → setup page → connection with site/scopes, project mapping, Sync now via the worker, Jira items in Activity and insights. The browser check found and fixed a wrong config path for the OAuth redirect URL.
+> - UI: provider badges and source filter for every connector; an Authorization panel for OAuth connections. Setup: `docs/runbooks/integrations.md` §11.
+
 > **Update: Phase 7 insights engine complete (2026-10-31).** Implemented and tested; browser-verified for admin (`/admin` dashboard), manager and employee (`/insights`) on the test database.
 > - **API:** `GET /api/v1/insights?projectId&teamId&from&to` (`services/insights.js`), computed on request from tasks, meetings, synced records, activities and confirmed relationships. No new tables or migration.
 > - **What it reports:**

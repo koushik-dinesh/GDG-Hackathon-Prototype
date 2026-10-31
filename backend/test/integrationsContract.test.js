@@ -81,8 +81,8 @@ describe('provider registry', () => {
       problem: null,
     });
     assert.equal(registry.get('fake'), fake);
-    assert.equal(registry.get('jira'), null);
-    assert.equal(registry.problem('jira'), 'Unknown provider');
+    assert.equal(registry.get('asana'), null);
+    assert.equal(registry.problem('asana'), 'Unknown provider');
     assert.equal(registry.problem('github'), 'GITHUB_APP_ID is not set', 'GitHub is registered and unavailable until configured');
   });
 

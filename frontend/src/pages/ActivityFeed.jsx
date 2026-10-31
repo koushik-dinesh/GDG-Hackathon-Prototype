@@ -5,6 +5,7 @@ import { listActivities, listActivityTypes } from '../api/workRecords.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { ActivityList } from '../components/ActivityList.jsx';
 import { EmptyState } from '../components/EmptyState.jsx';
+import { PROVIDER_OPTIONS } from '../components/records.jsx';
 import { Button, Card, ErrorAlert, Loading, inputClass } from '../components/ui.jsx';
 
 const PAGE = 30;
@@ -111,7 +112,7 @@ export function ActivityFeedPage() {
       <Card title="Filters" actions={anyFilter && <Button variant="link" onClick={() => setParams({}, { replace: true })}>Clear filters</Button>}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Select label="Project" value={filters.projectId} onChange={(v) => set('projectId', v)} options={[['', 'All my projects'], ...projects.map((p) => [String(p.id), p.name])]} />
-          <Select label="Source" value={filters.provider} onChange={(v) => set('provider', v)} options={[['', 'All sources'], ['workagent', 'WorkAgent'], ['github', 'GitHub']]} />
+          <Select label="Source" value={filters.provider} onChange={(v) => set('provider', v)} options={[['', 'All sources'], ...PROVIDER_OPTIONS]} />
           <Select label="What happened" value={filters.activityType} onChange={(v) => set('activityType', v)} options={[['', 'Anything'], ...types.map((t) => [t.id, t.label])]} />
           <Select label="About" value={filters.subjectType} onChange={(v) => set('subjectType', v)} options={SUBJECTS} />
           <label className="block text-sm">

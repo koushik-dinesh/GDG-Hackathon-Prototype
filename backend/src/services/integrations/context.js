@@ -27,6 +27,11 @@ export function buildContext(connector, connection, { resource = null, signal, v
         const found = await vault.get(connection.id, kind, { refresh });
         return found?.value ?? null;
       },
+      /** The stored credential value as it is, without refreshing (e.g. a refresh token), or null. */
+      async peek(kind) {
+        if (!connection.id) return null;
+        return (await vault.get(connection.id, kind))?.value ?? null;
+      },
       /** Replaces the stored credential with a fresh one from the connector (after a 401). */
       async refresh(kind) {
         if (!connection.id || !connector.refreshCredentials) return null;

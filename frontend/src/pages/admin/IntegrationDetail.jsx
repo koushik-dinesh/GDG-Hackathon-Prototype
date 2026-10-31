@@ -123,6 +123,7 @@ export function IntegrationDetailPage() {
           </div>
         )}
         {c.provider === 'github' && <GithubInstallation connection={c} />}
+        {c.provider !== 'github' && Array.isArray(c.settings?.scopes) && <OAuthGrant connection={c} />}
       </Card>
 
       <Card
@@ -136,8 +137,8 @@ export function IntegrationDetailPage() {
         }
       >
         <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          Everyone who can see a project can see the titles and activity of the resources mapped to it, including private repositories
-          they have no access to in {c.provider}. Map private resources only to projects whose members should see them.
+          Everyone who can see a project can see the titles and activity of the resources mapped to it, including private repositories or
+          projects they have no access to in the source application. Map private resources only to projects whose members should see them.
         </p>
         {resources.length === 0 ? (
           <p className="text-sm text-slate-500">No resources yet. Use “Refresh list” after granting access at the provider.</p>
@@ -236,6 +237,32 @@ function GithubInstallation({ connection: c }) {
           Manage repository access on GitHub
         </a>
       )}
+    </div>
+  );
+}
+
+// Where an admin revokes WorkAgent's access at each OAuth provider (disconnecting deletes the tokens here).
+const REVOKE_AT = {
+  jira: 'Atlassian account settings → Connected apps',
+  microsoft_teams: 'Microsoft Entra admin center → Enterprise applications',
+  outlook: 'Microsoft Entra admin center → Enterprise applications',
+  google_meet: 'Google Account → Security → Third-party connections',
+  figma: 'Figma → Settings → Security → Connected apps',
+};
+
+/** OAuth connections: what was granted, whether webhooks are on, and where to revoke the grant. */
+function OAuthGrant({ connection: c }) {
+  const s = c.settings ?? {};
+  return (
+    <div className="mt-4 rounded-md border border-slate-200 px-4 py-3 text-sm">
+      <p className="font-medium text-slate-900">Authorization</p>
+      {s.siteUrl && <p className="mt-1 text-slate-600">Site: {s.siteUrl}</p>}
+      {s.tenantId && <p className="mt-1 text-slate-600">Tenant: {s.tenantId}</p>}
+      <p className="mt-1 text-xs text-slate-500">Granted permissions: {s.scopes.length ? s.scopes.join(', ') : 'none reported'}</p>
+      {s.webhooks !== undefined && (
+        <p className="mt-1 text-xs text-slate-500">{s.webhooks ? 'Change notifications are on; scheduled sync also runs as a safety net.' : 'Change notifications are not configured; changes arrive with the scheduled sync.'}</p>
+      )}
+      {REVOKE_AT[c.provider] && <p className="mt-1 text-xs text-slate-500">To revoke access at the provider: {REVOKE_AT[c.provider]}.</p>}
     </div>
   );
 }

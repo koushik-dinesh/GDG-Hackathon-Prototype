@@ -262,3 +262,44 @@ Run this against a real App and a test repository. Live verification has **not**
 - **Re-running for everything** (after adding a matcher, or for data synced before Phase 5): `cd backend && npm run correlation:queue`. Safe to repeat: subjects that already have an active job are skipped.
 - **Worker scoping:** include `correlation.evaluate` in `WORKER_JOB_TYPES` if that variable is set.
 - **Rollback:** no migration. To disable, remove the handler from a worker's `WORKER_JOB_TYPES`; queued jobs stay pending. To discard open suggestions: `UPDATE record_links SET status='rejected' WHERE status='suggested' AND origin IN ('rule','ai')`.
+
+## 11. Jira Cloud
+
+**Status:** implemented and tested against a local fake of Atlassian's OAuth and Jira REST v3 (`backend/test/jira.test.js`, 22 tests). **Not verified against a live Jira site** — no Atlassian credentials were available.
+
+### 11.1 Create the OAuth app (once, by an Atlassian admin)
+
+1. developer.atlassian.com → Developer console → Create → **OAuth 2.0 integration**, e.g. "WorkAgent".
+2. **Permissions → Jira API → Add**, then configure these scopes: `read:jira-work`, `read:jira-user`. (`offline_access` is requested by WorkAgent itself so refresh tokens are issued.)
+3. **Authorization → OAuth 2.0 (3LO)**: callback URL `<APP_PUBLIC_URL>/integrations/jira/setup` (e.g. `https://workagent.example.com/integrations/jira/setup`). It must match exactly.
+4. **Settings**: copy the Client ID and Secret into `backend/.env` as `JIRA_CLIENT_ID` and `JIRA_CLIENT_SECRET`; set `JIRA_SITE_URL` to your site (`https://<company>.atlassian.net`). Restart the API and worker.
+5. While the app is in development, only its owner can consent; for other admins, set **Distribution → Sharing** on.
+
+### 11.2 Webhooks (recommended; polling works without them)
+
+1. Generate a secret: `openssl rand -hex 32`, set it as `JIRA_WEBHOOK_SECRET`, restart.
+2. In Jira: **Settings → System → WebHooks → Create a WebHook**: URL `<PUBLIC_WEBHOOK_BASE_URL>/api/v1/webhooks/jira`, the same **Secret**, events: Issue created/updated/deleted and Comment created/updated/deleted. Optionally restrict with JQL to the synced projects.
+3. Jira signs each delivery (`X-Hub-Signature: sha256=…`); unsigned or wrongly signed requests get 401 and are never stored. Deliveries are deduplicated by `X-Atlassian-Webhook-Identifier`.
+
+### 11.3 Connect and sync
+
+- Integrations → Jira → **Connect**. Atlassian asks for consent; choose the site in `JIRA_SITE_URL`. WorkAgent refuses grants for other sites or without offline access.
+- Projects appear as resources (disabled). Tick **Sync** and map each to a WorkAgent project.
+- Sync: open issues of any age plus everything updated in the backfill window, then incremental by `updated` (JQL in the API user's time zone, with a 5-minute overlap). Comments beyond those inlined in search results are fetched per issue.
+- Data: issues (key `PAY-42`, status and category, assignee, labels, due date, priority, parent), comments, people (Atlassian account ids; e-mail only if the user's privacy settings share it), and links: *blocks*, *duplicates*, *relates/clones* (related) and sub-tasks (*includes*). Deleted issues and comments are marked deleted, never removed.
+- `PAY-42` mentioned in GitHub, tasks or meetings is suggested as a relationship (Phase 5); Jira issues count in insights (Phase 7), including labels containing "blocked" and *blocks* links.
+
+### 11.4 Tokens, revocation and disconnecting
+
+- Access tokens last an hour and are refreshed automatically; Atlassian rotates the refresh token on each refresh and WorkAgent stores the new one with the access token (both encrypted).
+- If the grant is revoked or the refresh token expires (90 days without use), the connection turns to **error / needs reconnect**; use Connect again — resources, mappings and data are kept.
+- Disconnect deletes the stored tokens. Atlassian has no API to revoke a 3LO grant: also remove the app at **id.atlassian.com → Security → Connected apps**.
+- Rate limits: HTTP 429 with `Retry-After` pauses the connection until then.
+
+### 11.5 Live verification checklist (when credentials exist)
+
+1. Connect; check Integrations shows the site, scopes and projects.
+2. Enable one project; **Sync now**; compare issue count with `project = KEY AND (statusCategory != Done OR updated >= -90d)` in Jira.
+3. Edit an issue in Jira; with webhooks on it appears within seconds (Webhook deliveries list: processed), otherwise at the next sync.
+4. Revoke the app at id.atlassian.com; the next sync marks the connection *needs reconnect*.
+5. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.

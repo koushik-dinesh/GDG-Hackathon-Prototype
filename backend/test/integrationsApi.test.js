@@ -74,7 +74,7 @@ describe('access control', () => {
   it('lists providers with availability and no configuration values', async () => {
     const res = await as('admin').get('/api/v1/integrations/providers');
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body.providers.map((p) => [p.id, p.available]), [['github', false], ['fake', true]], 'GitHub is listed but not configured in tests');
+    assert.deepEqual(res.body.providers.map((p) => [p.id, p.available]), [['github', false], ['jira', false], ['fake', true]], 'real providers are listed but not configured in tests');
     assert.equal(res.body.providers[0].problem, 'GITHUB_APP_ID is not set');
   });
 });
@@ -117,7 +117,7 @@ describe('connecting', () => {
     await pool.execute('UPDATE integration_auth_states SET expires_at = DATE_SUB(NOW(), INTERVAL 1 SECOND)');
     assert.equal((await callback('admin', stateFrom(start2.body.redirectUrl))).body.error?.code, 'INVALID_STATE', 'expired');
     assert.equal((await callback('admin', 'x'.repeat(43))).body.error?.code, 'INVALID_STATE');
-    assert.equal((await as('admin').post('/api/v1/integrations/jira/connect')).status, 404, 'unknown provider');
+    assert.equal((await as('admin').post('/api/v1/integrations/asana/connect')).status, 404, 'unknown provider');
     assert.equal((await as('admin').post('/api/v1/integrations/github/connect')).status, 503, 'known but not configured');
     assert.equal((await as('admin').post('/api/v1/integrations/fake/callback', { state: 'short' })).status, 400);
   });

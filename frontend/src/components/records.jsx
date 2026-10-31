@@ -6,6 +6,10 @@ const PROVIDERS = {
   workagent: { label: 'WorkAgent', cls: 'bg-slate-900 text-white' },
   github: { label: 'GitHub', cls: 'bg-slate-700 text-white' },
   jira: { label: 'Jira', cls: 'bg-blue-600 text-white' },
+  microsoft_teams: { label: 'Teams', cls: 'bg-indigo-600 text-white' },
+  outlook: { label: 'Outlook', cls: 'bg-sky-600 text-white' },
+  google_meet: { label: 'Google Meet', cls: 'bg-emerald-600 text-white' },
+  figma: { label: 'Figma', cls: 'bg-fuchsia-600 text-white' },
   fake: { label: 'Fake', cls: 'bg-slate-200 text-slate-700' },
 };
 
@@ -13,6 +17,11 @@ export function ProviderBadge({ provider }) {
   const p = PROVIDERS[provider] ?? { label: provider, cls: 'bg-slate-200 text-slate-700' };
   return <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${p.cls}`}>{p.label}</span>;
 }
+
+/** [id, label] for every real source, for filters ("fake" only exists in tests and local checks). */
+export const PROVIDER_OPTIONS = Object.entries(PROVIDERS)
+  .filter(([id]) => id !== 'fake')
+  .map(([id, p]) => [id, p.label]);
 
 export const RECORD_TYPE_LABEL = {
   issue: 'Issue',
@@ -26,6 +35,12 @@ export const RECORD_TYPE_LABEL = {
   meeting: 'Meeting',
   project: 'Project',
   person: 'Person',
+  message: 'Message',
+  email: 'Email',
+  calendar_event: 'Calendar event',
+  conference: 'Conference',
+  design_file: 'Design file',
+  version: 'Version',
 };
 export const recordTypeLabel = (t) => RECORD_TYPE_LABEL[t] ?? (t ? t.replaceAll('_', ' ') : '');
 

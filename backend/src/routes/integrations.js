@@ -17,7 +17,7 @@ const callbackSchema = z
   .object({
     state: z.string().min(20).max(200),
     params: z
-      .record(z.string().max(64), z.union([z.string().max(500), z.number()]))
+      .record(z.string().max(64), z.union([z.string().max(4096), z.number()]))
       .refine((p) => Object.keys(p).length <= 20, 'Too many parameters')
       .default({}),
   })

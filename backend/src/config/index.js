@@ -134,6 +134,16 @@ const schema = z.object({
   GITHUB_API_URL: z.string().url().default('https://api.github.com'),
   GITHUB_WEB_URL: z.string().url().default('https://github.com'),
 
+  // Jira Cloud (OAuth 2.0 3LO app from developer.atlassian.com). Unset JIRA_CLIENT_ID = unavailable.
+  JIRA_CLIENT_ID: z.string().min(10).optional(),
+  JIRA_CLIENT_SECRET: z.string().min(10).optional(),
+  // The one Jira site this deployment syncs, e.g. https://acme.atlassian.net
+  JIRA_SITE_URL: z.string().url().optional(),
+  // Secret of the webhook an admin registers in Jira (System > Webhooks); optional: without it Jira is polled only.
+  JIRA_WEBHOOK_SECRET: z.string().min(20, 'Use a long random webhook secret (openssl rand -hex 32)').optional(),
+  JIRA_AUTH_URL: z.string().url().default('https://auth.atlassian.com'),
+  JIRA_API_URL: z.string().url().default('https://api.atlassian.com'),
+
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
   JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
@@ -307,6 +317,17 @@ export const config = {
         webhookSecrets: [env.GITHUB_WEBHOOK_SECRET, env.GITHUB_WEBHOOK_SECRET_PREVIOUS].filter(Boolean),
         apiUrl: env.GITHUB_API_URL.replace(/\/+$/, ''),
         webUrl: env.GITHUB_WEB_URL.replace(/\/+$/, ''),
+      },
+  // Jira Cloud. Tests configure a fake Jira explicitly and never see real values.
+  jira: isTest
+    ? { clientId: undefined, clientSecret: undefined, siteUrl: undefined, webhookSecret: undefined, authUrl: env.JIRA_AUTH_URL, apiUrl: env.JIRA_API_URL }
+    : {
+        clientId: env.JIRA_CLIENT_ID,
+        clientSecret: env.JIRA_CLIENT_SECRET,
+        siteUrl: env.JIRA_SITE_URL?.replace(/\/+$/, ''),
+        webhookSecret: env.JIRA_WEBHOOK_SECRET,
+        authUrl: env.JIRA_AUTH_URL.replace(/\/+$/, ''),
+        apiUrl: env.JIRA_API_URL.replace(/\/+$/, ''),
       },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,
