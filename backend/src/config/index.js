@@ -151,6 +151,16 @@ const schema = z.object({
   MS_LOGIN_URL: z.string().url().default('https://login.microsoftonline.com'),
   MS_GRAPH_URL: z.string().url().default('https://graph.microsoft.com'),
 
+  // Google Workspace (Google Meet through Calendar and the Meet REST API). Unset GOOGLE_CLIENT_ID = unavailable.
+  GOOGLE_CLIENT_ID: z.string().min(10).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(10).optional(),
+  // Only accounts of this Workspace domain can connect, e.g. acme.com
+  GOOGLE_WORKSPACE_DOMAIN: z.string().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/i, 'A domain such as acme.com').optional(),
+  GOOGLE_AUTH_URL: z.string().url().default('https://accounts.google.com'),
+  GOOGLE_TOKEN_URL: z.string().url().default('https://oauth2.googleapis.com/token'),
+  GOOGLE_CALENDAR_API_URL: z.string().url().default('https://www.googleapis.com'),
+  GOOGLE_MEET_API_URL: z.string().url().default('https://meet.googleapis.com'),
+
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
   JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
@@ -345,6 +355,18 @@ export const config = {
         tenantId: env.MS_TENANT_ID,
         loginUrl: env.MS_LOGIN_URL.replace(/\/+$/, ''),
         graphUrl: env.MS_GRAPH_URL.replace(/\/+$/, ''),
+      },
+  // Google Meet. Tests configure a fake Google explicitly.
+  google: isTest
+    ? { clientId: undefined, clientSecret: undefined, domain: undefined, authUrl: env.GOOGLE_AUTH_URL, tokenUrl: env.GOOGLE_TOKEN_URL, calendarUrl: env.GOOGLE_CALENDAR_API_URL, meetUrl: env.GOOGLE_MEET_API_URL }
+    : {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        domain: env.GOOGLE_WORKSPACE_DOMAIN?.toLowerCase(),
+        authUrl: env.GOOGLE_AUTH_URL.replace(/\/+$/, ''),
+        tokenUrl: env.GOOGLE_TOKEN_URL,
+        calendarUrl: env.GOOGLE_CALENDAR_API_URL.replace(/\/+$/, ''),
+        meetUrl: env.GOOGLE_MEET_API_URL.replace(/\/+$/, ''),
       },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,

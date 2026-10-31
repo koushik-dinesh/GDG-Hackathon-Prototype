@@ -6,6 +6,7 @@ import { assertConnector } from './contract.js';
 import { keyring } from './crypto.js';
 import fake from './providers/fake/index.js';
 import github from './providers/github/index.js';
+import googleMeet from './providers/google/meet.js';
 import jira from './providers/jira/index.js';
 import outlook from './providers/microsoft/outlook.js';
 import microsoftTeams from './providers/microsoft/teams.js';
@@ -47,4 +48,4 @@ export function createRegistry(connectors, { keyConfigured = () => keyring.isCon
 // Real providers are always registered and become available once configured (GitHub: Phase 3B).
 // The fake provider exists for tests and, with INTEGRATIONS_FAKE_PROVIDER=true outside
 // production, for trying the UI.
-export const registry = createRegistry([github, jira, microsoftTeams, outlook, ...(config.integrations.fakeProvider ? [fake] : [])]);
+export const registry = createRegistry([github, jira, microsoftTeams, outlook, googleMeet, ...(config.integrations.fakeProvider ? [fake] : [])]);

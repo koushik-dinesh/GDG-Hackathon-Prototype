@@ -339,3 +339,35 @@ Run this against a real App and a test repository. Live verification has **not**
 3. Connect Outlook; enable Inbox and Calendar; check mail previews and events (with join links).
 4. Remove admin consent in Entra; the next sync marks the connection *needs reconnect*.
 5. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.
+
+## 13. Google Meet
+
+**Status:** implemented and tested against a local fake of Google OAuth, Calendar v3 and Meet v2 (`backend/test/googleMeet.test.js`, 14 tests incl. the contract suite and end to end). **Not verified against a live Google Workspace.** **Push notifications are not implemented** (the Workspace Events API needs Cloud Pub/Sub): changes arrive with the scheduled sync.
+
+### 13.1 Create the OAuth client (once, in Google Cloud console)
+
+1. Create or choose a project; enable **Google Calendar API** and **Google Meet REST API**.
+2. OAuth consent screen: **Internal** (Workspace users only); scopes `openid`, `email`, `…/auth/calendar.readonly`, `…/auth/meetings.space.readonly`.
+3. Credentials → OAuth client ID → *Web application*; authorized redirect URI `<APP_PUBLIC_URL>/integrations/google_meet/setup`.
+4. `backend/.env`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_WORKSPACE_DOMAIN` (e.g. `acme.com`). Restart API and worker.
+
+### 13.2 What is synced
+
+- A connection is one Workspace account (whoever signs in). Accounts outside `GOOGLE_WORKSPACE_DOMAIN`, partial consent (Google lets users untick scopes) and grants without offline access are refused.
+- Resources: that account's calendars. Per calendar:
+  - **Calendar events with a Google Meet link** (other events are skipped): title, description (first 2,000 characters), start/end, organizer, attendee count, join link; key = the Meet code (`abc-defg-hij`). First run from the backfill window, then Google's sync token; cancelled or deleted events become *deleted* (stored content kept); an expired token (410) restarts from the window.
+  - **Conference records** (primary calendar only): when a Meet call happened, how many joined, and links to transcripts if Google produced them (the transcript text itself is not copied). Live calls are revisited until they end.
+- Organizers are matched to WorkAgent users with the same e-mail.
+
+### 13.3 Tokens and disconnecting
+
+- Access tokens (~1 h) refresh automatically; Google refresh tokens do not rotate. A revoked grant turns the connection to *needs reconnect*.
+- Disconnect revokes the grant at Google (`/revoke`, best effort) and deletes the stored tokens.
+
+### 13.4 Live verification checklist
+
+1. Connect with a Workspace account; calendars are listed. Enable the primary calendar and map it.
+2. Sync now; Meet events and recent conference records appear with join links / participant counts.
+3. Cancel a Meet event; after the next sync it shows *deleted*.
+4. Connect with a personal Gmail account: refused with the domain message.
+5. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.
