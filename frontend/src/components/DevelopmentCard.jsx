@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import { listActivities, listExternalRecords } from '../api/workRecords.js';
 import { formatDateTime } from '../utils/format.js';
 import { Card, ErrorAlert, Loading } from './ui.jsx';
@@ -55,7 +56,14 @@ export function DevelopmentCard({ projectId }) {
   if (data.items.length === 0 && data.activities.length === 0) return null;
 
   return (
-    <Card title="Development">
+    <Card
+      title="Development"
+      actions={
+        <Link to={`/activity?projectId=${projectId}`} className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
+          View all activity
+        </Link>
+      }
+    >
       <div className="grid gap-6 md:grid-cols-2">
         <section aria-label="Open issues and pull requests">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Open issues &amp; pull requests</h3>
@@ -70,7 +78,10 @@ export function DevelopmentCard({ projectId }) {
                     <span className="text-xs text-slate-500">{KIND[r.recordType] ?? r.recordType}</span>
                   </div>
                   <p className="mt-0.5 break-words">
-                    <SourceLink url={r.url}>{r.title}</SourceLink> <span className="text-slate-500">{r.externalKey}</span>
+                    <Link to={`/records/${r.id}`} className="font-medium text-slate-900 hover:underline">
+                      {r.title}
+                    </Link>{' '}
+                    <span className="text-slate-500">{r.externalKey}</span> <SourceLink url={r.url}>↗</SourceLink>
                   </p>
                   {r.author && <p className="text-xs text-slate-500">by {r.author.login ?? r.author.displayName}</p>}
                 </li>
@@ -87,7 +98,7 @@ export function DevelopmentCard({ projectId }) {
               {data.activities.map((a) => (
                 <li key={a.id} className="text-slate-600">
                   <span className="text-slate-400">{formatDateTime(a.occurredAt)}</span>{' '}
-                  {a.record?.url ? <SourceLink url={a.record.url}>{a.summary}</SourceLink> : <span>{a.summary}</span>}
+                  {a.subject?.url ? <SourceLink url={a.subject.url}>{a.summary}</SourceLink> : <span>{a.summary}</span>}
                 </li>
               ))}
             </ul>

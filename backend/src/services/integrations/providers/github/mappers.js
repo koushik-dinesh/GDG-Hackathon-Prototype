@@ -20,6 +20,20 @@ const people = (users) => (users ?? []).filter((u) => u?.id !== undefined).map((
 const labelsOf = (labels) => (labels ?? []).map((l) => (typeof l === 'string' ? l : l?.name)).filter(Boolean);
 const milestoneOf = (m) => (m ? { title: m.title, number: m.number, state: m.state, dueOn: m.due_on ?? null } : null);
 
+// GitHub's own closing keywords ("Fixes #12", "closes acme/api#3"): GitHub links and closes the
+// issue itself, so these are provider-stated relationships (origin 'source'), not guesses.
+// Only references to the same repository are linked (other repositories' ids aren't known here).
+const CLOSING = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:([\w.-]+\/[\w.-]+))?#(\d+)\b/gi;
+export function closingIssueNumbers(text, repo) {
+  const out = new Set();
+  for (const m of String(text ?? '').matchAll(CLOSING)) {
+    if (!m[1] || m[1].toLowerCase() === String(repo.full_name).toLowerCase()) out.add(Number(m[2]));
+  }
+  return [...out];
+}
+
+const link = (fromRef, toRef, linkType) => ({ type: 'link', fromRef, toRef, linkType });
+
 export const repoRef = (repo) => ({ id: String(repo.id), fullName: repo.full_name ?? repo.name });
 const numberKey = (repo, number) => `${repo.id}#${number}`;
 
@@ -167,6 +181,10 @@ export function pullEnvelopes(source, repo, pr) {
     },
   });
   out.push(activity(source, `pull_request:${key}:created`, 'created', ref, pr.user, pr.created_at, `${pr.user?.login ?? 'someone'} opened pull request ${repo.full_name}#${pr.number}`));
+  for (const n of closingIssueNumbers(`${pr.title ?? ''}\n${pr.body ?? ''}`, repo)) {
+    out.push(link(ref, { recordType: 'issue', externalId: numberKey(repo, n) }, 'fixes'));
+  }
+  if (pr.merged_at && pr.merge_commit_sha) out.push(link(ref, { recordType: 'commit', externalId: `${repo.id}:${pr.merge_commit_sha}` }, 'includes'));
   if (pr.merged_at) {
     out.push(activity(source, `pull_request:${key}:merged:${ms(pr.merged_at)}`, 'merged', ref, pr.merged_by ?? null, pr.merged_at, `${repo.full_name}#${pr.number} was merged`, { baseRef: pr.base?.ref ?? null }));
   } else if (pr.closed_at) {
@@ -280,6 +298,7 @@ export function commitEnvelopes(source, repo, { sha, message, authorUser, author
       metadata: { sha, branch: branch ?? null, authorName: authorName ?? null, committerName: committerName ?? null, verified: verified ?? null },
     },
     activity(source, `commit:${repo.id}:${sha}:committed`, 'committed', ref, actor, committedAt ?? authoredAt, `${actor?.login ?? authorName ?? 'someone'} committed to ${repo.full_name}${branch ? ` (${branch})` : ''}: ${firstLine.slice(0, 120)}`),
+    ...closingIssueNumbers(message, repo).map((n) => link(ref, { recordType: 'issue', externalId: numberKey(repo, n) }, 'fixes')),
   ].filter(Boolean);
 }
 

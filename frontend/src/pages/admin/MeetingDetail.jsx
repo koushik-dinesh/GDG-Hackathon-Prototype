@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { getMeeting, getTranscript, updateMeeting } from '../../api/meetings.js';
 import { MeetingBotPanel } from '../../components/MeetingBotPanel.jsx';
 import { MeetingForm } from '../../components/MeetingForm.jsx';
+import { RelatedRecords } from '../../components/RelatedRecords.jsx';
 import { TranscriptUpload } from '../../components/TranscriptUpload.jsx';
 import { TranscriptViewer } from '../../components/TranscriptViewer.jsx';
 import { Button, Card, ErrorAlert, Loading, StatusBadge, SuccessAlert } from '../../components/ui.jsx';
@@ -234,6 +235,8 @@ export function MeetingDetailPage() {
           <MeetingEmails meeting={meeting} onMeetingChanged={refreshMeeting} />
         </Card>
       )}
+
+      <RelatedRecords type="meeting" id={meeting.id} />
     </div>
   );
 }

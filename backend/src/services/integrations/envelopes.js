@@ -2,10 +2,11 @@
 // handleWebhook(). The framework validates every envelope here before anything is written. Source
 // content is untrusted: lengths are bounded, long text is truncated, and only http(s) URLs pass.
 import { z } from 'zod';
+import { ACTIVITY_TYPE_NAMES } from '../activities/types.js';
 
 export const BODY_MAX_CHARS = 60_000;
 export const STATUS_CATEGORIES = ['todo', 'in_progress', 'done', 'cancelled', 'unknown'];
-export const LINK_TYPES = ['references', 'implements', 'fixes', 'duplicates', 'same_as', 'blocks', 'depends_on', 'discussed_in', 'related'];
+export const LINK_TYPES = ['references', 'implements', 'fixes', 'duplicates', 'same_as', 'blocks', 'depends_on', 'discussed_in', 'related', 'includes', 'tracks'];
 
 const typeName = z.string().regex(/^[a-z][a-z0-9_]{1,47}$/);
 const externalId = z.coerce.string().min(1).max(191);
@@ -75,7 +76,8 @@ export const recordEnvelope = z.object({
 export const activityEnvelope = z.object({
   type: z.literal('activity'),
   dedupeKey: z.string().min(1).max(191),
-  activityType: typeName,
+  // The shared vocabulary (services/activities/types.js): one meaning per verb across providers.
+  activityType: z.enum(ACTIVITY_TYPE_NAMES),
   recordRef,
   actorRef: userRef.nullish(),
   occurredAt: date,

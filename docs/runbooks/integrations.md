@@ -218,3 +218,33 @@ Run this against a real App and a test repository. Live verification has **not**
 9. **Uninstall:** uninstall the App on GitHub. **Expect:** status *Disconnected*, *Stored credentials* "None", and synced data still visible.
 10. **Secrets:** search the API and worker logs for `ghs_`, `BEGIN` and the webhook secret. **Expect:** no matches.
 11. **Record the result:** date, App ID (not the key), and any deviations, in `docs/WORKAGENT_CURRENT_STATE.md`.
+
+## 9. Unified activity, search and relationships (Phase 4)
+
+- **Activity feed** (`/activity`, `GET /api/v1/activities`): WorkAgent events and connected-application events in one timeline.
+  - WorkAgent events cover tasks (created, assigned, started, completed, reopened), meetings (scheduled, conducted, review completed) and projects (created, status changed).
+  - Filters: project, person, source, activity type, subject type, status, date range and record. Paged with "Load more".
+  - Visibility follows projects. Task events follow task visibility: members see only their own tasks; project owners and admins see all.
+- **Activity vocabulary:** `backend/src/services/activities/types.js`. Connectors must use these verbs.
+- **WorkAgent activities** come from the audit entry of each change (`services/audit.js` → `services/activities/internal.js`), in the same transaction.
+  - History before Phase 4: run `npm run activities:backfill`. It is idempotent: a second run creates 0.
+- **Record changes without a provider event** (status change, rename, deletion at the source, archival) are added by ingest, with the connectors' own key format, so they never duplicate a webhook event.
+- **Search** (`/search` and the header box, `GET /api/v1/search`) covers projects, meetings, tasks and synced records.
+  - Uses MySQL InnoDB FULLTEXT (migration 008). Words of 3+ letters are prefix-matched; shorter words and keys (`#12`, a commit sha) use LIKE.
+  - Records deleted at the source are hidden unless `includeDeleted=true`.
+- **Relationships** (Related records on record, task and meeting pages; `GET/POST/PATCH /api/v1/record-links`):
+  - **Who may change them:** admins anywhere; managers when both records are in projects they manage; employees never.
+  - **Removing** a relationship rejects it, so its history and provenance stay.
+  - **Inferred relationships** (`origin` rule/ai) are only ever *suggested*. A person confirms or rejects them, and a rejected one is never suggested again (`services/correlation/`).
+  - **GitHub-stated relationships** (origin `source`, confirmed): "Fixes/Closes/Resolves #N" in a PR or commit (same repository), and a merged PR `includes` its merge commit.
+- **Source status** on record pages:
+  - *deleted*: deleted at the source;
+  - *disconnected* / *needs reconnect*: integration status;
+  - *access removed* / *not syncing*: the repository.
+
+  In every case the data and history are kept, and nothing is deleted automatically.
+- **Retention:**
+  - records, activities and relationships are kept indefinitely;
+  - webhook payloads for 14 days (§3);
+  - deleting synced data on request is a Phase 11 feature.
+- **Rollback of 008:** `docs/runbooks/rollback-008.sql`. It only removes indexes and two relationship types.

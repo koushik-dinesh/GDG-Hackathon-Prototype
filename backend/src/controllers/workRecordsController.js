@@ -1,17 +1,20 @@
-// Read APIs for synced work (Phase 3A, docs/PHASE_3A_PLAN.md §9), plus admin link review.
+// Synced work, the unified activity feed, relationships and search (Phase 3A read APIs, extended
+// in Phase 4).
 //
-// Visibility follows projects: a record or activity is visible to whoever can see its project
-// (admins, the owner, members). Records with no project are admin-only. Invisible things are 404,
-// the same as for projects themselves.
-import { pool } from '../db/pool.js';
+// Visibility follows projects (services/records/access.js): a record or activity is visible to
+// whoever can see its project; task activities follow task visibility; records with no project are
+// admin-only. Invisible things are 404, the same as for projects themselves.
 import { withTransaction } from '../db/transaction.js';
-import * as activities from '../repositories/activitiesRepository.js';
 import * as records from '../repositories/externalRecordsRepository.js';
 import * as projects from '../repositories/projectsRepository.js';
-import * as links from '../repositories/recordLinksRepository.js';
-import { audit, recordAudit } from '../services/audit.js';
-import { createLink } from '../services/integrations/links.js';
-import { canViewProject, isAdmin } from '../services/permissions.js';
+import { recordAudit } from '../services/audit.js';
+import { listFeed } from '../services/activities/feed.js';
+import { ACTIVITY_TYPES } from '../services/activities/types.js';
+import { accessScope, canSeeProject } from '../services/records/access.js';
+import { resolveRefs } from '../services/records/refs.js';
+import { createManualLink, pendingSuggestions, relationshipsOf, reviewLink } from '../services/records/relationships.js';
+import { search as runSearch } from '../services/search.js';
+import { isAdmin } from '../services/permissions.js';
 import { badRequest, notFound } from '../utils/errors.js';
 
 // Opaque keyset cursors: base64url JSON { t: ISO time, id }.
@@ -28,22 +31,14 @@ export function decodeCursor(value) {
   }
 }
 
-async function canSeeProject(user, projectId) {
-  if (isAdmin(user)) return true;
-  if (!projectId) return false;
-  const project = await projects.findById(projectId);
-  if (!project) return false;
-  return canViewProject(user, project, await projects.isMember(projectId, user.id));
-}
-
-/** The project filter a request may use: a visible project id, null (unassigned, admins), or all (admins). */
-async function scopeFor(req) {
+/** The project filter a request may use: a visible project id, null (unassigned, admins), or all visible. */
+async function scopeFor(req, scope) {
   const { projectId, unassigned } = req.query;
   if (projectId) {
-    if (!(await projects.findById(projectId)) || !(await canSeeProject(req.user, projectId))) throw notFound('Project not found');
+    if (!(await projects.findById(projectId)) || !canSeeProject(scope, projectId)) throw notFound('Project not found');
     return projectId;
   }
-  if (!isAdmin(req.user)) throw badRequest('projectId is required', [{ field: 'projectId', message: 'Choose a project' }]);
+  if (unassigned && !scope.admin) throw badRequest('Only admins can list records without a project', [{ field: 'unassigned', message: 'Choose a project' }]);
   return unassigned ? null : undefined;
 }
 
@@ -55,12 +50,17 @@ function page(rows, limit, keyOf) {
 }
 
 export async function listRecords(req, res) {
-  const projectId = await scopeFor(req);
+  const scope = await accessScope(req.user);
+  const projectId = await scopeFor(req, scope);
   const cursor = decodeCursor(req.query.before);
   const rows = await records.listForRead({
     projectId,
+    // Without a project: every project the person can see (admins: everything).
+    visibleProjectIds: projectId === undefined && !scope.admin ? scope.visible : undefined,
     recordType: req.query.recordType,
     statusCategory: req.query.statusCategory,
+    provider: req.query.provider,
+    includeDeleted: req.query.includeDeleted,
     q: req.query.q,
     before: cursor && { sortAt: cursor.time, id: cursor.id },
     limit: req.query.limit,
@@ -69,26 +69,27 @@ export async function listRecords(req, res) {
   res.json({ records: items, next });
 }
 
-/** Links of a record that this user may see: admins see all; others only confirmed links to visible records. */
-async function visibleLinks(user, recordId) {
-  const all = await links.listFor({ type: 'external_record', id: recordId });
-  if (isAdmin(user)) return all;
-  const out = [];
-  for (const link of all) {
-    if (link.status !== 'confirmed') continue;
-    const other = link.from.type === 'external_record' && link.from.id === recordId ? link.to : link.from;
-    if (other.type !== 'external_record') continue;
-    const otherRecord = await records.findById(other.id);
-    if (otherRecord && (await canSeeProject(user, otherRecord.projectId))) out.push(link);
-  }
-  return out;
-}
-
 export async function getRecord(req, res) {
+  const scope = await accessScope(req.user);
   const record = await records.findForRead(req.params.id);
-  if (!record || !(await canSeeProject(req.user, record.projectId))) throw notFound('Record not found');
-  const timeline = await activities.listForRead({ recordId: record.id, limit: 100 });
-  res.json({ record, activities: timeline.slice(0, 100), links: await visibleLinks(req.user, record.id) });
+  if (!record || !canSeeProject(scope, record.projectId)) throw notFound('Record not found');
+  const refs = [{ type: 'external_record', id: record.id }, ...(record.parentRecordId ? [{ type: 'external_record', id: record.parentRecordId }] : []), ...(record.projectId ? [{ type: 'project', id: record.projectId }] : [])];
+  const summaries = await resolveRefs(refs);
+  const self = summaries.get(`external_record:${record.id}`);
+  const parent = record.parentRecordId ? summaries.get(`external_record:${record.parentRecordId}`) : null;
+  const children = await records.listChildren(record.id);
+  const [timeline, links] = await Promise.all([
+    listFeed(scope, { recordId: record.id, limit: 100 }),
+    relationshipsOf(scope, { type: 'external_record', id: record.id }),
+  ]);
+  res.json({
+    record: { ...record, sourceStatus: self?.sourceStatus ?? 'current', project: record.projectId ? { id: record.projectId, name: summaries.get(`project:${record.projectId}`)?.title } : null },
+    parent: parent && canSeeProject(scope, parent.projectId) ? parent : null,
+    children,
+    activities: timeline.slice(0, 100),
+    links,
+    canManageRelationships: isAdmin(req.user) || req.user.role === 'manager',
+  });
 }
 
 /** Admin: move one record to a project by hand; it then stays there when its resource is re-mapped. */
@@ -116,32 +117,66 @@ export async function setRecordProject(req, res) {
   res.json({ record: await records.findForRead(before.id) });
 }
 
+/** The unified activity feed across WorkAgent and connected applications. */
 export async function listActivities(req, res) {
-  const projectId = await scopeFor(req);
+  const scope = await accessScope(req.user);
+  const projectId = await scopeFor(req, scope);
   const cursor = decodeCursor(req.query.before);
-  const rows = await activities.listForRead({ projectId, before: cursor && { occurredAt: cursor.time, id: cursor.id }, limit: req.query.limit });
-  const { items, next } = page(rows, req.query.limit, (a) => a.occurredAt);
+  const q = req.query;
+  const rows = await listFeed(scope, {
+    projectId: projectId ?? undefined,
+    unassigned: projectId === null,
+    userId: q.userId,
+    provider: q.provider,
+    activityTypes: q.activityType,
+    from: q.from,
+    to: q.to,
+    recordId: q.recordId,
+    entityType: q.entityType,
+    entityId: q.entityId,
+    subjectType: q.subjectType,
+    status: q.status,
+    before: cursor && { occurredAt: cursor.time, id: cursor.id },
+    limit: q.limit,
+  });
+  const { items, next } = page(rows, q.limit, (a) => a.occurredAt);
   res.json({ activities: items, next });
 }
 
-/** Admin: a person links two things (confirmed immediately). */
-export async function createRecordLink(req, res) {
-  const { from, to, linkType } = req.body;
-  const result = await withTransaction(async (conn) => {
-    const r = await createLink(conn, { from, to, linkType, origin: 'manual', createdBy: req.user.id });
-    if (r.inserted) {
-      await recordAudit(conn, { actorUserId: req.user.id, action: 'record_link.created', entityType: 'record_link', entityId: r.id, after: { from, to, linkType }, ip: req.ip });
-    }
-    return r;
-  });
-  res.status(result.inserted ? 201 : 200).json({ link: await links.findById(result.id) });
+/** The vocabulary, for filters. */
+export function listActivityTypes(req, res) {
+  res.json({ activityTypes: Object.entries(ACTIVITY_TYPES).map(([id, label]) => ({ id, label })) });
 }
 
-/** Admin: confirm or reject a suggested (or any) link. */
-export async function reviewRecordLink(req, res) {
-  const link = await links.findById(req.params.id);
-  if (!link) throw notFound('Link not found');
-  await links.setReview(pool, link.id, { status: req.body.status, reviewedBy: req.user.id });
-  await audit({ actorUserId: req.user.id, action: `record_link.${req.body.status}`, entityType: 'record_link', entityId: link.id, before: { status: link.status }, ip: req.ip });
-  res.json({ link: await links.findById(link.id) });
+/** Relationships of any record (external record, meeting, task, user) the person can see. */
+export async function listRecordLinks(req, res) {
+  const scope = await accessScope(req.user);
+  if (req.query.status === 'suggested' && !req.query.type) {
+    res.json({ suggestions: await pendingSuggestions(scope) });
+    return;
+  }
+  if (!req.query.type) throw badRequest('Choose a record', [{ field: 'type', message: 'type and id are required' }]);
+  res.json({ links: await relationshipsOf(scope, { type: req.query.type, id: req.query.id }) });
 }
+
+/** A person links two records (admins; managers within projects they manage). Confirmed at once. */
+export async function createRecordLink(req, res) {
+  const scope = await accessScope(req.user);
+  const { link, created } = await createManualLink(scope, req.body, { ip: req.ip });
+  res.status(created ? 201 : 200).json({ link });
+}
+
+/** Confirm or reject a relationship (rejecting is how a relationship is removed; history stays). */
+export async function reviewRecordLink(req, res) {
+  const scope = await accessScope(req.user);
+  res.json({ link: await reviewLink(scope, req.params.id, req.body.status, { ip: req.ip }) });
+}
+
+/** Unified search across projects, meetings, tasks and external records. */
+export async function search(req, res) {
+  const scope = await accessScope(req.user);
+  const { q, types, projectId, recordType, provider, includeDeleted, limit } = req.query;
+  if (projectId && (!(await projects.findById(projectId)) || !canSeeProject(scope, projectId))) throw notFound('Project not found');
+  res.json(await runSearch(scope, q, { types, projectId, recordType, provider, includeDeleted, limit }));
+}
+

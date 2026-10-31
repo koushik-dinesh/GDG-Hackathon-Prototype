@@ -10,6 +10,8 @@ import { MeetingDetailPage } from './MeetingDetail.jsx';
 import { ReviewActionItems } from './ReviewActionItems.jsx';
 
 vi.mock('../../api/meetings.js');
+// Related records are covered by their own tests; the meeting page only hosts them.
+vi.mock('../../components/RelatedRecords.jsx', () => ({ RelatedRecords: () => null }));
 vi.mock('../../api/actionItems.js');
 // The meeting page also renders the bot panel; keep it offline.
 vi.mock('../../api/bot.js', () => ({

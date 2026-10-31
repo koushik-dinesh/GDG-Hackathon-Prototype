@@ -4,7 +4,10 @@ import { ProtectedRoute } from './auth/ProtectedRoute.jsx';
 import { AppShell } from './components/AppShell.jsx';
 import { AcceptInvitationPage } from './pages/AcceptInvitation.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
+import { ActivityFeedPage } from './pages/ActivityFeed.jsx';
 import { IntegrationSetupPage } from './pages/IntegrationSetup.jsx';
+import { RecordDetailPage } from './pages/RecordDetail.jsx';
+import { SearchPage } from './pages/SearchPage.jsx';
 import { AdminDashboard } from './pages/admin/Dashboard.jsx';
 import { IntegrationDetailPage } from './pages/admin/IntegrationDetail.jsx';
 import { IntegrationsPage } from './pages/admin/Integrations.jsx';
@@ -70,6 +73,10 @@ export const router = createBrowserRouter([
           { path: '/projects', element: <ProjectsPage /> },
           { path: '/projects/:id', element: <ProjectDetailPage /> },
           { path: '/teams', element: <TeamsPage /> },
+          // Phase 4: unified activity feed, synced record pages and search (server enforces visibility).
+          { path: '/activity', element: <ActivityFeedPage /> },
+          { path: '/records/:id', element: <RecordDetailPage /> },
+          { path: '/search', element: <SearchPage /> },
         ],
       },
     ],

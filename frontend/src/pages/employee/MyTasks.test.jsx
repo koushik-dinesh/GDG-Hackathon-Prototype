@@ -11,6 +11,7 @@ import { TaskDetail } from './TaskDetail.jsx';
 
 vi.mock('../../api/tasks.js');
 vi.mock('../../api/auth.js');
+vi.mock('../../api/workRecords.js', () => ({ listRecordLinks: vi.fn(async () => ({ links: [] })) }));
 
 const employee = { id: 5, email: 'ana@example.test', fullName: 'Ana Garcia', role: 'employee', isActive: true };
 

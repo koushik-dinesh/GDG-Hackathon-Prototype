@@ -104,11 +104,17 @@ describe('Project development card', () => {
           : [{ id: 3, recordType: 'issue', externalKey: 'acme/payments#1', title: 'Refunds fail', url: 'https://github.com/acme/payments/issues/1', statusCategory: 'todo', author: { login: 'ana' } }],
     }));
     workRecords.listActivities.mockResolvedValue({
-      activities: [{ id: 9, occurredAt: '2026-10-30T09:00:00Z', summary: 'ana reviewed acme/payments#3 (approved)', record: { url: 'https://github.com/acme/payments/pull/3' } }],
+      activities: [{ id: 9, occurredAt: '2026-10-30T09:00:00Z', summary: 'ana reviewed acme/payments#3 (approved)', subject: { type: 'external_record', id: 1, url: 'https://github.com/acme/payments/pull/3' } }],
     });
-    render(<DevelopmentCard projectId={3} />);
+    render(
+      <MemoryRouter>
+        <DevelopmentCard projectId={3} />
+      </MemoryRouter>,
+    );
     const open = await screen.findByRole('region', { name: 'Open issues and pull requests' });
-    expect(within(open).getByRole('link', { name: 'Fix checkout' }).getAttribute('href')).toBe('https://github.com/acme/payments/pull/3');
+    expect(within(open).getByRole('link', { name: 'Fix checkout' }).getAttribute('href')).toBe('/records/1');
+    expect(within(open).getAllByRole('link', { name: '↗' })[0].getAttribute('href')).toBe('https://github.com/acme/payments/pull/3');
+    expect(screen.getByRole('link', { name: 'View all activity' }).getAttribute('href')).toBe('/activity?projectId=3');
     expect(within(open).getByText('Refunds fail')).toBeTruthy();
     expect(within(open).queryByText('Merged thing')).toBeNull();
     expect(within(open).getByText('by raj')).toBeTruthy();
@@ -120,12 +126,20 @@ describe('Project development card', () => {
   it('renders nothing for projects without synced work, and reports errors', async () => {
     workRecords.listExternalRecords.mockResolvedValue({ records: [] });
     workRecords.listActivities.mockResolvedValue({ activities: [] });
-    const { container } = render(<DevelopmentCard projectId={3} />);
+    const { container } = render(
+      <MemoryRouter>
+        <DevelopmentCard projectId={3} />
+      </MemoryRouter>,
+    );
     await vi.waitFor(() => expect(screen.queryByText(/Loading development activity/)).toBeNull());
     expect(container.textContent).toBe('');
     cleanup();
     workRecords.listExternalRecords.mockRejectedValue(new Error('Project not found'));
-    render(<DevelopmentCard projectId={3} />);
+    render(
+      <MemoryRouter>
+        <DevelopmentCard projectId={3} />
+      </MemoryRouter>,
+    );
     expect(await screen.findByText('Could not load development activity: Project not found')).toBeTruthy();
   });
 });

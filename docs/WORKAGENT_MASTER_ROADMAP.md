@@ -13,7 +13,7 @@ Status legend: **Complete** · **Complete (uncommitted)** · **Partial** · **No
 | 1 | Audit & foundation stabilization | Complete with limitations (uncommitted) | Lease fix in `queue.js`/`runner.js` + regression test; `MEETING_TIMEZONE=UTC` in test script; scripts derive `PROJECT_DIR`; `.run/` ignored; tests pass | Commit; refresh stale live-integration notes; deployment docs move to Phase 11 |
 | 2 | Core work management | **Complete** (2.5 closeout done 2026-10-30) | Committed on `phase-2-work-management`; dev DB at 004; browser-verified admin/manager/employee flows; 285/285 backend, 78/78 frontend | Optional: password reset (decision pending), manager access to meetings |
 | 3 | Universal integration framework | **3A complete; 3B implemented** (2026-10-30), live GitHub not yet verified | GitHub App connector on the 3A framework; 456 backend / 91 frontend tests; browser-verified against a local fake GitHub | Run the live verification (runbook §8.4) with a real App |
-| 4 | Unified work data model | Partial | Internal entities, plus `external_records`, `activities`, `record_links` and `external_identities` (3A) | Decisions, commitments, blockers, dependencies, insights |
+| 4 | Unified work data model | **Complete** (2026-10-31) | Unified record summaries for internal and external records; one activity vocabulary; internal activities and backfill; relationship management with provenance and review; unified feed and search, with UI; 477 backend / 101 frontend tests; browser-verified for 3 roles | Commitments, decisions, blockers and dependencies as records move to Phase 5/6, with the insights they feed |
 | 5 | Cross-app intelligence | Not started | Reusable: assignee matcher, normalizer, validator | Everything |
 | 6 | Generalized AI action engine | Partial (meetings only) | Claude extraction + deterministic validation + review | New sources, commitment model, external task linking |
 | 7 | Intelligence dashboard | Partial | Project detail page with meetings/tasks/activity (real data); My Tasks | Org overview, timeline, risks, insights; admin dashboard is a placeholder |
@@ -22,7 +22,7 @@ Status legend: **Complete** · **Complete (uncommitted)** · **Partial** · **No
 | 10 | Notifications & automation | Partial (email only) | Explicit-confirmation action-item email with idempotency | Alerts, digests, policies, external writes |
 | 11 | Security, production & device | Partial | Session revocation, bcrypt, zod, secrets in env, prompt-injection precautions | Deployment, HTTPS, backups, monitoring, secret encryption, retention; device workstream |
 
-Complete: 2 (Phases 1 and 2), plus 3A, and 3B in code (live check pending). Partial: 7 (3, 4, 6, 7, 9, 10, 11). Not started: 2 (5, 8). Next: **live GitHub verification**, then Phase 4.
+Complete: Phases 1, 2, 3A, 4, and 3B in code (live GitHub check pending). Partial: 3, 6, 7, 9, 10, 11. Not started: 5, 8. Next: **Phase 5, cross-application correlation**, which plugs into `services/correlation/`.
 
 ---
 

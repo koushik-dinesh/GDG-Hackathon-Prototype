@@ -66,3 +66,18 @@ export async function deleteForEndpoints(conn, type, ids) {
 export async function setReview(conn, id, { status, reviewedBy }) {
   await conn.execute('UPDATE record_links SET status = ?, reviewed_by = ?, reviewed_at = NOW() WHERE id = ?', [status, reviewedBy, id]);
 }
+
+export async function listByStatus(status, { limit = 100 } = {}, conn = pool) {
+  const [rows] = await conn.query('SELECT * FROM record_links WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?', [status, limit]);
+  return rows.map(toLink);
+}
+
+/** An existing link between the two endpoints of this type, in either stored direction. */
+export async function findBetween(conn, { from, to, linkType }) {
+  const [rows] = await conn.query(
+    `SELECT * FROM record_links WHERE link_type = ? AND ((from_type = ? AND from_id = ? AND to_type = ? AND to_id = ?)
+       OR (from_type = ? AND from_id = ? AND to_type = ? AND to_id = ?))`,
+    [linkType, from.type, from.id, to.type, to.id, to.type, to.id, from.type, from.id],
+  );
+  return rows[0] ? toLink(rows[0]) : null;
+}

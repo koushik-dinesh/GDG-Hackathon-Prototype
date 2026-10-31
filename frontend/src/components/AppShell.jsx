@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthContext.jsx';
 
@@ -6,24 +7,35 @@ const NAV = {
     { to: '/admin', label: 'Dashboard', end: true },
     { to: '/admin/meetings', label: 'Meetings' },
     { to: '/projects', label: 'Projects' },
+    { to: '/activity', label: 'Activity' },
     { to: '/teams', label: 'Teams' },
     { to: '/admin/users', label: 'Users' },
     { to: '/admin/integrations', label: 'Integrations' },
   ],
   manager: [
     { to: '/projects', label: 'Projects' },
+    { to: '/activity', label: 'Activity' },
     { to: '/teams', label: 'Teams' },
     { to: '/my/tasks', label: 'My tasks' },
   ],
   employee: [
     { to: '/my/tasks', label: 'My tasks' },
     { to: '/projects', label: 'Projects' },
+    { to: '/activity', label: 'Activity' },
   ],
 };
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [q, setQ] = useState('');
+
+  function search(e) {
+    e.preventDefault();
+    if (!q.trim()) return;
+    navigate(`/search?${new URLSearchParams({ q: q.trim() })}`);
+    setQ('');
+  }
 
   async function handleLogout() {
     await logout();
@@ -52,6 +64,16 @@ export function AppShell() {
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
+            <form onSubmit={search} role="search" className="hidden md:block">
+              <input
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search…"
+                aria-label="Search WorkAgent"
+                className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-slate-500 focus:outline-none"
+              />
+            </form>
             <span className="hidden text-slate-600 sm:inline">
               {user.fullName} · <span className="capitalize">{user.role}</span>
             </span>

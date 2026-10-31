@@ -449,7 +449,14 @@ function TasksCard({ projectId }) {
 function ActivityCard({ projectId, refreshKey }) {
   const { data, error } = useProjectList(getProjectActivity, projectId, refreshKey);
   return (
-    <Card title="Activity">
+    <Card
+      title="Activity"
+      actions={
+        <Link to={`/activity?projectId=${projectId}`} className="text-sm font-medium text-slate-700 underline-offset-2 hover:underline">
+          View all activity
+        </Link>
+      }
+    >
       {error && <ErrorAlert error={`Could not load activity: ${error.message}`} />}
       {!data && !error && <Loading />}
       {data?.activity.length === 0 && <p className="text-sm text-slate-500">No activity yet.</p>}

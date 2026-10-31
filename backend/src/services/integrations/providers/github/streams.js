@@ -12,7 +12,9 @@
 import { ProviderError } from '../../errors.js';
 import { commentEnvelopes, commitEnvelopes, issueEnvelopes, pullEnvelopes, repositoryEnvelopes, restCommit, reviewCommentEnvelopes, reviewEnvelopes } from './mappers.js';
 
-export const STREAMS = ['repository', 'issues', 'pulls', 'issue_comments', 'review_comments', 'commits'];
+// Parents first: issues and commits exist before the pull requests that fix or include them,
+// and before the comments and reviews that belong to them.
+export const STREAMS = ['repository', 'issues', 'commits', 'pulls', 'issue_comments', 'review_comments'];
 const PER_PAGE = 100;
 const REVIEWS_PER_CHUNK = 5;
 const OVERLAP_MS = 2 * 60 * 1000;

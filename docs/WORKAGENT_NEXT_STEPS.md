@@ -1,4 +1,14 @@
-# WorkAgent — Next Steps (2026-10-30)
+# WorkAgent — Next Steps (2026-10-31)
+
+> **Phase 4 is complete. Next: Phase 5, cross-application correlation.**
+> - Register matchers in `services/correlation/` and run them on ingest and for new internal records. Matchers produce suggestions only, with confidence and evidence:
+>   - key references in text (`acme/api#12`, `PAY-42`);
+>   - title and body similarity;
+>   - shared people (identities → users);
+>   - time proximity to meetings;
+>   - project context.
+> - People review suggestions in Related records, which is already built. Rejected suggestions are never resurrected, which is already enforced.
+> - Live GitHub verification (runbook §8.4) remains a separate configuration task.
 
 > **Update: Phase 3B (GitHub) is implemented and tested against a fake GitHub. Live verification is pending.**
 >

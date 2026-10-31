@@ -140,7 +140,7 @@ const READ_SELECT = `
  * projectId: number (that project), null (records with no project; admins only), undefined (all).
  * before: { sortAt: Date, id } keyset cursor. Returns limit+1 rows so the caller can tell if more exist.
  */
-export async function listForRead({ projectId, recordType, statusCategory, q, before, limit }) {
+export async function listForRead({ projectId, visibleProjectIds, recordType, statusCategory, provider, includeDeleted = false, q, before, limit }) {
   const where = [];
   const params = [];
   if (projectId === null) where.push('r.project_id IS NULL');
@@ -148,6 +148,16 @@ export async function listForRead({ projectId, recordType, statusCategory, q, be
     where.push('r.project_id = ?');
     params.push(projectId);
   }
+  if (visibleProjectIds) {
+    where.push(visibleProjectIds.length ? 'r.project_id IN (?)' : 'FALSE');
+    if (visibleProjectIds.length) params.push(visibleProjectIds);
+  }
+  if (provider) {
+    where.push('r.provider = ?');
+    params.push(provider);
+  }
+  // Records deleted at the source are kept (history) but hidden unless asked for.
+  if (!includeDeleted) where.push('r.source_deleted_at IS NULL');
   if (recordType) {
     where.push('r.record_type = ?');
     params.push(recordType);
@@ -174,9 +184,29 @@ export async function listForRead({ projectId, recordType, statusCategory, q, be
 
 /** One record for the detail view (summary + body + metadata), or null. */
 export async function findForRead(id) {
-  const [rows] = await pool.query(`${READ_SELECT.replace('SELECT r.id,', 'SELECT r.body, r.metadata, r.id,')} WHERE r.id = ?`, [id]);
+  const [rows] = await pool.query(
+    `${READ_SELECT.replace('SELECT r.id,', 'SELECT r.body, r.metadata, r.external_id, r.source_instance, r.project_locked, r.first_seen_at, r.last_synced_at, r.id,')} WHERE r.id = ?`,
+    [id],
+  );
   if (!rows[0]) return null;
-  return { ...toRecordSummary(rows[0]), body: rows[0].body, metadata: parseJson(rows[0].metadata) };
+  const row = rows[0];
+  // Provider identity is always kept: provider + source instance + external id (+ key and URL).
+  return {
+    ...toRecordSummary(row),
+    externalId: row.external_id,
+    sourceInstance: row.source_instance,
+    projectLocked: Boolean(row.project_locked),
+    firstSeenAt: row.first_seen_at,
+    lastSyncedAt: row.last_synced_at,
+    body: row.body,
+    metadata: parseJson(row.metadata),
+  };
+}
+
+/** Records that belong to this one (comments, reviews), oldest first. Summaries only. */
+export async function listChildren(parentId, { limit = 200 } = {}) {
+  const [rows] = await pool.query(`${READ_SELECT} WHERE r.parent_record_id = ? ORDER BY r.source_created_at, r.id LIMIT ?`, [parentId, limit]);
+  return rows.map(toRecordSummary);
 }
 
 /** Sets a record's project by hand (locks it against resource re-mapping) and moves its activities. */

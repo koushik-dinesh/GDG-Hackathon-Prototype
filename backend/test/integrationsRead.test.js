@@ -109,7 +109,7 @@ describe('records', () => {
       assert.equal(res.body.next, null);
     }
     assert.equal((await as('outsider').get(`/api/v1/external-records?projectId=${ids.P}`)).status, 404);
-    assert.equal((await as('member').get('/api/v1/external-records')).status, 400, 'non-admins must choose a project');
+    assert.equal((await as('member').get('/api/v1/external-records')).status, 200, 'without a project: every project the person can see (Phase 4)');
     assert.equal((await as('member').get('/api/v1/external-records?projectId=999999')).status, 404);
   });
 
@@ -153,7 +153,7 @@ describe('activities', () => {
   it('is a per-project timeline with the same visibility', async () => {
     const res = await as('member').get(`/api/v1/activities?projectId=${ids.P}&limit=1`);
     assert.deepEqual(res.body.activities.map((a) => a.summary), ['ana opened #2']);
-    assert.equal(res.body.activities[0].record.externalKey, 'org/api#2');
+    assert.equal(res.body.activities[0].subject.key, 'org/api#2');
     const more = await as('member').get(`/api/v1/activities?projectId=${ids.P}&limit=1&before=${res.body.next}`);
     assert.deepEqual(more.body.activities.map((a) => a.summary), ['ana opened #1']);
     assert.equal(more.body.next, null);
@@ -163,20 +163,30 @@ describe('activities', () => {
 });
 
 describe('links', () => {
-  it('admins create (idempotently) and review links; others cannot', async () => {
+  it('admins create (idempotently) and review links; managers only within their projects; employees never', async () => {
     const [m] = await pool.execute("INSERT INTO meetings (title, meeting_url, platform, native_meeting_id, created_by) VALUES ('Payments sync', 'https://meet.google.com/aaa-bbbb-ccc', 'google_meet', 'aaa-bbbb-ccc', ?)", [ids.admin]);
     const body = { from: { type: 'external_record', id: await recordId('1') }, to: { type: 'meeting', id: m.insertId }, linkType: 'discussed_in' };
     const created = await as('admin').post('/api/v1/record-links', body);
     assert.equal(created.status, 201);
     assert.deepEqual([created.body.link.origin, created.body.link.status, created.body.link.createdBy], ['manual', 'confirmed', ids.admin]);
     assert.equal((await as('admin').post('/api/v1/record-links', body)).status, 200, 'same link again');
-    assert.equal((await as('manager').post('/api/v1/record-links', body)).status, 403);
+    // The meeting has no project: the manager can't see it, and invisible things are 404.
+    assert.equal((await as('manager').post('/api/v1/record-links', body)).status, 404);
     assert.equal((await as('admin').post('/api/v1/record-links', { ...body, to: { type: 'meeting', id: 999999 } })).status, 400);
     assert.equal((await as('admin').post('/api/v1/record-links', { ...body, to: { type: 'project', id: ids.P } })).status, 400, 'projects are not link endpoints');
 
+    // A meeting in the manager's own project: the manager may link it; a member who can see both may not.
+    const [mp] = await pool.execute("INSERT INTO meetings (title, meeting_url, platform, native_meeting_id, created_by, project_id) VALUES ('Payments planning', 'https://meet.google.com/ppp-qqqq-rrr', 'google_meet', 'ppp-qqqq-rrr', ?, ?)", [ids.admin, ids.P]);
+    const own = { ...body, to: { type: 'meeting', id: mp.insertId } };
+    assert.equal((await as('member').post('/api/v1/record-links', own)).status, 403, 'employees never edit relationships');
+    const byManager = await as('manager').post('/api/v1/record-links', own);
+    assert.equal(byManager.status, 201);
+    assert.equal((await as('member').patch(`/api/v1/record-links/${byManager.body.link.id}`, { status: 'rejected' })).status, 403);
+    assert.equal((await as('manager').patch(`/api/v1/record-links/${byManager.body.link.id}`, { status: 'rejected' })).body.link.status, 'rejected');
+
     const reviewed = await as('admin').patch(`/api/v1/record-links/${created.body.link.id}`, { status: 'rejected' });
     assert.deepEqual([reviewed.body.link.status, reviewed.body.link.reviewedBy], ['rejected', ids.admin]);
-    assert.equal((await as('member').patch(`/api/v1/record-links/${created.body.link.id}`, { status: 'confirmed' })).status, 403);
+    await pool.execute('DELETE FROM record_links WHERE id = ?', [byManager.body.link.id]);
   });
 
   it('non-admins only see confirmed links to records they can see', async () => {

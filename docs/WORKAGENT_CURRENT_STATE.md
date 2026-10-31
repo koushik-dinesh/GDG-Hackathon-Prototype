@@ -1,5 +1,30 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 4 complete — unified records, activities, relationships, feed and search (2026-10-31).** Implemented and tested; browser-verified with admin, manager and employee accounts on the test database.
+> - **Activity vocabulary:** one verb set for every source (`services/activities/types.js`), enforced on connector envelopes.
+> - **WorkAgent events** (tasks, meetings, projects) become activities from the audit entry of each change, in the same transaction.
+>   - `npm run activities:backfill` recreates history and is idempotent. On the dev DB it created 36 activities, then 0 on the second run.
+> - **Changes without a provider event** (status change, rename, deletion at the source, archival) become activities during ingest, deduplicated against webhook events.
+> - **Unified record model:** any reference (external record, meeting, task, project, user) resolves to one summary shape with source status (`services/records/refs.js`). Shared visibility rules live in `services/records/access.js`.
+> - **Relationships:** list, add, confirm and reject (removal = rejection, history kept). Admins anywhere; managers within projects they manage; employees read-only.
+>   - GitHub-stated links: closing keywords, and a merged PR's merge commit.
+>   - Correlation boundary for Phase 5 (`services/correlation/`): suggestions only, rejected ones never resurrected, matcher registry, identity/key/project-context helpers.
+> - **Feed:** `GET /api/v1/activities` with filters for project, person, provider, type, subject type, status, dates and record; keyset paging; non-admins see their permitted scope without choosing a project; activities expose `subject`.
+> - **Search:** `GET /api/v1/search` over projects, meetings, tasks and synced records, using MySQL FULLTEXT (migration 008) with a LIKE fallback for keys and short words; permission-filtered.
+> - **UI:**
+>   - Activity page (`/activity`) with filters and "Load more";
+>   - record page (`/records/:id`) with source identity, source status, discussion, timeline and Related records;
+>   - search page and header search box;
+>   - provider badges and source links;
+>   - "View all activity" on project pages;
+>   - Related records on task and meeting pages.
+> - **Database:** migration `008_unified_feed_search.sql` (indexes, FULLTEXT, link types `includes`/`tracks`). The dev DB is migrated (backup `backups/meeting_action-pre-008-20261031-055305.sql`). Rollback: `docs/runbooks/rollback-008.sql`.
+> - **Tests:** backend 477/477 (21 new Phase 4 tests plus updated read-API tests), frontend 101/101 (10 new), build OK.
+> - **Limitations:**
+>   - Search relevance uses MySQL's boolean FULLTEXT mode (no stemming or typo tolerance).
+>   - Backfilled summaries use names as they are at backfill time.
+>   - Relationship suggestions need Phase 5 matchers to appear; none are registered yet.
+
 > **Update: Phase 3B GitHub App integration implemented (2026-10-30). Live GitHub has NOT been verified yet.**
 > - **Connector:** `services/integrations/providers/github/` implements the Phase 3A contract: settings, App JWT and installation tokens, mappers, sync streams, webhooks. No GitHub-specific tables.
 > - **Auth:**

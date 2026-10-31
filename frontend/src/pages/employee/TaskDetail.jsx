@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { getMyTask } from '../../api/tasks.js';
+import { RelatedRecords } from '../../components/RelatedRecords.jsx';
 import { PRIORITY_STYLE, STATUS_LABEL, TaskStatusBadge, TaskStatusControl } from '../../components/tasks/TaskStatus.jsx';
 import { Card, ErrorAlert, Loading, SuccessAlert } from '../../components/ui.jsx';
 import { formatDate, formatDateTime, formatTimestamp } from '../../utils/format.js';
@@ -127,6 +128,8 @@ export function TaskDetail() {
           </ol>
         )}
       </Card>
+
+      <RelatedRecords type="action_item" id={task.id} />
     </div>
   );
 }

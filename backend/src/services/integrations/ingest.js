@@ -24,6 +24,35 @@ const emptyStats = () => ({
   links: { inserted: 0, duplicate: 0, skipped: 0 },
 });
 
+const msOf = (d) => (d ? new Date(d).getTime() : Date.now());
+
+/**
+ * Activities implied by a record update when the provider sent no event for it. Only meaningful
+ * changes count (status, title, deletion, archival), not metadata churn.
+ */
+export function recordTransitions(source, before, after) {
+  const base = `${source}:${after.recordType}:${after.externalId}`;
+  const at = after.sourceUpdatedAt ?? new Date();
+  const label = after.externalKey ?? after.title ?? after.externalId;
+  const out = [];
+  if (!before.sourceDeletedAt && after.sourceDeletedAt) {
+    out.push({ dedupeKey: `${base}:deleted`, activityType: 'deleted', occurredAt: after.sourceDeletedAt, summary: `${label} was deleted at the source` });
+  } else if (before.state !== 'archived' && after.state === 'archived') {
+    out.push({ dedupeKey: `${base}:archived:${msOf(at)}`, activityType: 'archived', occurredAt: at, summary: `${label} was archived` });
+  } else if (before.statusCategory !== after.statusCategory && after.statusCategory !== 'unknown') {
+    out.push({
+      dedupeKey: `${base}:status:${after.statusCategory}:${msOf(at)}`,
+      activityType: 'status_changed',
+      occurredAt: at,
+      summary: `${label} changed from ${before.statusCategory.replace('_', ' ')} to ${after.statusCategory.replace('_', ' ')}`,
+      details: { from: before.statusCategory, to: after.statusCategory, state: after.state ?? null },
+    });
+  } else if (before.title !== after.title && before.title) {
+    out.push({ dedupeKey: `${base}:updated:${msOf(at)}`, activityType: 'updated', occurredAt: at, summary: `${label} was renamed to “${after.title}”`, details: { from: before.title } });
+  }
+  return out.map((a) => ({ type: 'activity', actorRef: null, details: null, ...a }));
+}
+
 /** Hash of everything that describes the record's content (not when we saw it). */
 export function contentHash(r) {
   const normalized = {
@@ -65,6 +94,7 @@ export async function ingest(conn, { connector, connection, resource = null, env
   const source = { provider: connector.id, sourceInstance: connector.sourceInstance };
   const identityIds = new Map(); // externalUserId -> id
   const recordCache = new Map(); // recordType:externalId -> record
+  const pendingActivities = []; // derived from record changes (see recordTransitions)
 
   async function identityId(ref) {
     if (!ref) return null;
@@ -123,6 +153,7 @@ export async function ingest(conn, { connector, connection, resource = null, env
     next.contentHash = contentHash(next);
 
     let id;
+    const transitions = existing ? recordTransitions(connector.sourceInstance, existing, next) : [];
     if (!existing) {
       // A concurrent insert of the same record raises ER_DUP_ENTRY (or a deadlock); the caller's
       // transaction rolls back and the job is retried, which then takes the update path.
@@ -138,10 +169,17 @@ export async function ingest(conn, { connector, connection, resource = null, env
       stats.records.updated++;
     }
     recordCache.set(`${e.recordType}:${e.externalId}`, { ...next, id, projectLocked: existing?.projectLocked ?? false });
+    // Changes the provider sent no event for (sync, or a provider without events) still appear on
+    // the timeline: status changes, title changes, deletion and archival. Keys follow the
+    // connectors' own format, so a provider event for the same change is the same activity.
+    const reported = new Set(parsed.filter((x) => x.type === 'activity').map((x) => `${x.recordRef.recordType}:${x.recordRef.externalId}`));
+    if (!reported.has(`${e.recordType}:${e.externalId}`)) {
+      for (const t of transitions) pendingActivities.push({ ...t, recordRef: { recordType: e.recordType, externalId: e.externalId } });
+    }
   }
 
   // 3. Activities: once per dedupe key, attached to a known record.
-  for (const e of parsed.filter((x) => x.type === 'activity')) {
+  for (const e of [...parsed.filter((x) => x.type === 'activity'), ...pendingActivities]) {
     const record = await recordFor(e.recordRef);
     if (!record) {
       stats.activities.skipped++;
