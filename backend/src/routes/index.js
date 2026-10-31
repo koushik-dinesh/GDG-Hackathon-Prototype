@@ -5,6 +5,7 @@ import { authRouter } from './auth.js';
 import { directoryRouter } from './directory.js';
 import { emailsRouter } from './emails.js';
 import { healthRouter } from './health.js';
+import { insightsRouter } from './insights.js';
 import { integrationsRouter } from './integrations.js';
 import { meetingsRouter } from './meetings.js';
 import { projectsRouter } from './projects.js';
@@ -34,6 +35,8 @@ apiRouter.use('/activities', requireAuth, activitiesRouter);
 apiRouter.use('/record-links', requireAuth, recordLinksRouter);
 // Unified search (Phase 4) across projects, meetings, tasks and synced records.
 apiRouter.use('/search', requireAuth, searchRouter);
+// Insights (Phase 7): health, overdue, blockers, reviews, follow-through, workload, trends; scoped per person.
+apiRouter.use('/insights', requireAuth, insightsRouter);
 // Inbound provider webhooks: public, verified by signature (services/integrations/webhooks.js).
 apiRouter.use('/webhooks', webhooksRouter);
 // The signed-in user's own tasks (employee portal). Not admin-only, but always scoped to req.user.

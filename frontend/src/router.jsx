@@ -5,6 +5,7 @@ import { AppShell } from './components/AppShell.jsx';
 import { AcceptInvitationPage } from './pages/AcceptInvitation.jsx';
 import { LoginPage } from './pages/LoginPage.jsx';
 import { ActivityFeedPage } from './pages/ActivityFeed.jsx';
+import { InsightsPage } from './pages/Insights.jsx';
 import { IntegrationSetupPage } from './pages/IntegrationSetup.jsx';
 import { RecordDetailPage } from './pages/RecordDetail.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
@@ -78,6 +79,8 @@ export const router = createBrowserRouter([
           { path: '/activity', element: <ActivityFeedPage /> },
           { path: '/records/:id', element: <RecordDetailPage /> },
           { path: '/search', element: <SearchPage /> },
+          // Phase 7: insights for what each person may see (the API scopes them by role).
+          { path: '/insights', element: <InsightsPage /> },
           // Phase 5: relationship suggestions to review (the API returns only what the person may decide).
           {
             element: <ProtectedRoute roles={['admin', 'manager']} />,

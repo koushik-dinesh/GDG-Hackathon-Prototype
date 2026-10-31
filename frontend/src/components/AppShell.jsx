@@ -14,6 +14,7 @@ const NAV = {
     { to: '/admin/integrations', label: 'Integrations' },
   ],
   manager: [
+    { to: '/insights', label: 'Insights' },
     { to: '/projects', label: 'Projects' },
     { to: '/activity', label: 'Activity' },
     { to: '/suggestions', label: 'Suggestions' },
@@ -22,6 +23,7 @@ const NAV = {
   ],
   employee: [
     { to: '/my/tasks', label: 'My tasks' },
+    { to: '/insights', label: 'Insights' },
     { to: '/projects', label: 'Projects' },
     { to: '/activity', label: 'Activity' },
   ],

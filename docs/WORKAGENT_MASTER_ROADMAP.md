@@ -16,13 +16,13 @@ Status legend: **Complete** · **Complete (uncommitted)** · **Partial** · **No
 | 4 | Unified work data model | **Complete** (2026-10-31) | Unified record summaries for internal and external records; one activity vocabulary; internal activities and backfill; relationship management with provenance and review; unified feed and search, with UI; 477 backend / 101 frontend tests; browser-verified for 3 roles | Commitments, decisions, blockers and dependencies as records move to Phase 5/6, with the insights they feed |
 | 5 | Cross-app intelligence | **Correlation complete** (2026-10-31) | Key-reference, wording-overlap and meeting-window matchers; `correlation.evaluate` job queued from ingest and audit; suggestions with confidence + evidence; human review page; withdrawal on source deletion; 490 backend / 102 frontend tests; browser-verified | Blocker/stall/review-wait and risk detection move to the insights engine (Phase 7); embedding/LLM similarity optional later |
 | 6 | Generalized AI action engine | Partial (meetings only) | Claude extraction + deterministic validation + review | New sources, commitment model, external task linking |
-| 7 | Intelligence dashboard | Partial | Project detail page with meetings/tasks/activity (real data); My Tasks | Org overview, timeline, risks, insights; admin dashboard is a placeholder |
+| 7 | Intelligence dashboard | **Complete** (2026-10-31) | `GET /api/v1/insights`: project health, overdue, blockers/dependencies, review progress, follow-through, workload, stalled work, trends; facts vs labelled inferences; role-scoped; admin dashboard + `/insights`; 497 backend / 106 frontend tests; browser-verified for 3 roles | Configurable thresholds; caching if data grows |
 | 8 | Ops center | Not started (data exists) | `jobs`, `audit_logs`, `email_messages`, `extraction_runs` (tokens) tables | All UIs + cost accounting |
 | 9 | Reliable sync | Partial (queue only) | Lease-safe MySQL queue, retries, dead state, dedupe, reschedule | Sync cursors, webhook ingestion, ordering, backfill, reconciliation, token refresh |
 | 10 | Notifications & automation | Partial (email only) | Explicit-confirmation action-item email with idempotency | Alerts, digests, policies, external writes |
 | 11 | Security, production & device | Partial | Session revocation, bcrypt, zod, secrets in env, prompt-injection precautions | Deployment, HTTPS, backups, monitoring, secret encryption, retention; device workstream |
 
-Complete: Phases 1, 2, 3A, 4, 5 (correlation), and 3B in code (live GitHub check pending). Partial: 3, 6, 7, 9, 10, 11. Not started: 8. Next: **Phase 7, intelligence and insights engine** (health, overdue, follow-through, blockers, review progress, workload, risks), then the remaining connectors.
+Complete: Phases 1, 2, 3A, 4, 5 (correlation), 7 (insights), and 3B in code (live GitHub check pending). Partial: 3, 6, 9, 10, 11. Not started: 8. Next: **the remaining connectors** (Jira, Microsoft Teams, Outlook, Google Meet, Figma) on the provider framework.
 
 ---
 

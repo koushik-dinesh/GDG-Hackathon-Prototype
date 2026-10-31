@@ -1,5 +1,20 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 7 insights engine complete (2026-10-31).** Implemented and tested; browser-verified for admin (`/admin` dashboard), manager and employee (`/insights`) on the test database.
+> - **API:** `GET /api/v1/insights?projectId&teamId&from&to` (`services/insights.js`), computed on request from tasks, meetings, synced records, activities and confirmed relationships. No new tables or migration.
+> - **What it reports:**
+>   - per-project health with the facts behind it (open/overdue/blocked tasks, open issues and PRs, PRs waiting for review, stalled items, open dependencies, target date);
+>   - overdue tasks (oldest first), blockers (blocked tasks, records labelled "blocked" at the source, confirmed `blocks`/`depends_on` relationships with an unfinished blocker, flagged when they cross projects);
+>   - review progress per open, non-draft PR (awaiting first review / changes requested / approved not merged, days waiting, requested reviewers), PRs merged and median hours to merge;
+>   - meeting follow-through (approved tasks done/open/overdue per meeting in the period);
+>   - workload per assignee; stalled work (no update for 14+ days); weekly trend (tasks created/completed, records opened/closed, PRs merged);
+>   - a summary of highlights generated from those figures only (no AI text).
+> - **Facts vs inferences:** counts and lists are `kind: 'fact'`; project health and the "busiest person" note are `kind: 'inference'` with the rule that produced them. Thresholds are returned as `rules`.
+> - **Visibility:** Phase 4 rules. Admins see everything; managers projects they own or belong to (all tasks of projects they own); employees their own tasks plus records and meetings of their projects. Health is computed on what the requester can see. A project or team filter the person cannot see is 404; bad periods are 400 (max one year).
+> - **UI:** `/admin` is now the organisation dashboard (the placeholder is gone); `/insights` for managers and employees (nav link). Project, team and period filters; every item links to its task, meeting, project or record page.
+> - **Tests:** backend 497/497 (7 new), frontend 106/106 (4 new), build OK.
+> - **Limitations:** rule thresholds are constants (`RULES` in `services/insights.js`), not yet configurable; computed on request (fine at single-company scale; cache if the data grows); the team filter applies to people-based figures (tasks, overdue, workload, follow-through), not to synced records.
+
 > **Update: Phase 5 complete — cross-application correlation (2026-10-31).** Implemented and tested; browser-verified with a manager account on the test database (worker-produced suggestions reviewed, confirmed and rejected).
 > - **Matchers** (`services/correlation/matchers.js`), provider-independent, on the unified model only:
 >   - *key-reference*: `owner/repo#N` and Jira-style `PAY-42` keys (0.9), `#N` within the same repository (0.75) → `references`;
