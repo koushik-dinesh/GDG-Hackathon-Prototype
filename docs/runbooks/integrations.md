@@ -248,3 +248,17 @@ Run this against a real App and a test repository. Live verification has **not**
   - webhook payloads for 14 days (§3);
   - deleting synced data on request is a Phase 11 feature.
 - **Rollback of 008:** `docs/runbooks/rollback-008.sql`. It only removes indexes and two relationship types.
+
+## 10. Relationship suggestions (Phase 5)
+
+- **What produces them:** job `correlation.evaluate`, run by the worker. It is queued (one active job per subject) when ingest inserts or updates a record, and when tasks or meetings change (approval, edit, project change, transcript, review completed).
+- **Matchers** (`backend/src/services/correlation/matchers.js`):
+  - *Explicit reference* — `owner/repo#12`, `PAY-42` (0.9), `#12` inside one repository (0.75).
+  - *Similar wording* — an approved task and an issue/PR in the same project (0.45–0.9; +0.1 when the same person).
+  - *Around a meeting* — an issue/PR created 1 day before to 3 days after a meeting of its project, about the same topic (0.45–0.8).
+  - Further matchers can be added with `registerMatcher()`; they must return suggestions only.
+- **Review:** `/suggestions` (admins everywhere, managers within projects they manage) or Related records on any record/task/meeting page. Confirming creates the relationship; rejecting keeps the row as rejected so it is never suggested again.
+- **Nothing is ever linked automatically.** Records deleted at the source withdraw their open suggestions.
+- **Re-running for everything** (after adding a matcher, or for data synced before Phase 5): `cd backend && npm run correlation:queue`. Safe to repeat: subjects that already have an active job are skipped.
+- **Worker scoping:** include `correlation.evaluate` in `WORKER_JOB_TYPES` if that variable is set.
+- **Rollback:** no migration. To disable, remove the handler from a worker's `WORKER_JOB_TYPES`; queued jobs stay pending. To discard open suggestions: `UPDATE record_links SET status='rejected' WHERE status='suggested' AND origin IN ('rule','ai')`.

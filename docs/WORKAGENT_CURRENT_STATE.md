@@ -1,5 +1,18 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Phase 5 complete — cross-application correlation (2026-10-31).** Implemented and tested; browser-verified with a manager account on the test database (worker-produced suggestions reviewed, confirmed and rejected).
+> - **Matchers** (`services/correlation/matchers.js`), provider-independent, on the unified model only:
+>   - *key-reference*: `owner/repo#N` and Jira-style `PAY-42` keys (0.9), `#N` within the same repository (0.75) → `references`;
+>   - *wording-overlap*: an approved task and an issue/PR of the same project sharing ≥2 significant words covering ≥50% of the shorter text (0.45–0.9, +0.1 when the task assignee is the record's author via identities) → `tracks`;
+>   - *meeting-window*: an issue/PR created from 1 day before to 3 days after a meeting of its project, sharing words with the meeting or its tasks (0.45–0.8) → `discussed_in`.
+>   - Keys, URLs and shas are stripped before wording comparison, so identifiers never count as shared topic words.
+> - **Engine** (`evaluate()` in `services/correlation/index.js`): runs built-in and registered matchers, never pairs a record with itself, skips any pair that already has a link in any status (so rejected suggestions are never resurrected and confirmed ones never duplicated), stores evidence `{matcher, reason, …}` and confidence. Suggestions are only ever `suggested`; people confirm or reject.
+> - **Re-evaluation:** job `correlation.evaluate` (deduplicated per subject) is queued by ingest for every inserted/updated record and by audit entries for task approval/update/project change and meeting create/update/transcript/review completion.
+> - **Deleted records:** a record deleted at the source withdraws its open suggestions (marked rejected, history kept); deleted records are never suggested as targets. Disconnected integrations keep their data and confirmed links.
+> - **UI:** `/suggestions` (admins and managers): both ends, relationship type, matcher, confidence, reason, Confirm/Reject. Managers see suggestions within projects they manage; employees have no access (route-guarded, API 403/404).
+> - **Tests:** backend 490/490 (13 new), frontend 102/102 (1 new), build OK. No migration.
+> - **Limitations:** deterministic rules only (no embeddings/LLM similarity); MySQL natural-language FULLTEXT preselects candidates (no stemming); Jira keys only become useful once a Jira connector syncs records.
+
 > **Update: Phase 4 complete — unified records, activities, relationships, feed and search (2026-10-31).** Implemented and tested; browser-verified with admin, manager and employee accounts on the test database.
 > - **Activity vocabulary:** one verb set for every source (`services/activities/types.js`), enforced on connector envelopes.
 > - **WorkAgent events** (tasks, meetings, projects) become activities from the audit entry of each change, in the same transaction.
@@ -23,7 +36,7 @@
 > - **Limitations:**
 >   - Search relevance uses MySQL's boolean FULLTEXT mode (no stemming or typo tolerance).
 >   - Backfilled summaries use names as they are at backfill time.
->   - Relationship suggestions need Phase 5 matchers to appear; none are registered yet.
+>   - Relationship suggestions need Phase 5 matchers to appear (added in Phase 5).
 
 > **Update: Phase 3B GitHub App integration implemented (2026-10-30). Live GitHub has NOT been verified yet.**
 > - **Connector:** `services/integrations/providers/github/` implements the Phase 3A contract: settings, App JWT and installation tokens, mappers, sync streams, webhooks. No GitHub-specific tables.

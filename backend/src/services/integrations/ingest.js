@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import * as activities from '../../repositories/activitiesRepository.js';
 import * as identities from '../../repositories/externalIdentitiesRepository.js';
 import * as records from '../../repositories/externalRecordsRepository.js';
+import { queueEvaluation } from '../correlation/schedule.js';
 import { parseEnvelopes } from './envelopes.js';
 import { createLink } from './links.js';
 
@@ -95,6 +96,7 @@ export async function ingest(conn, { connector, connection, resource = null, env
   const identityIds = new Map(); // externalUserId -> id
   const recordCache = new Map(); // recordType:externalId -> record
   const pendingActivities = []; // derived from record changes (see recordTransitions)
+  const changedRecords = new Set(); // ids to re-evaluate for correlation
 
   async function identityId(ref) {
     if (!ref) return null;
@@ -159,12 +161,14 @@ export async function ingest(conn, { connector, connection, resource = null, env
       // transaction rolls back and the job is retried, which then takes the update path.
       id = await records.insert(conn, next);
       stats.records.inserted++;
+      if (e.recordType !== 'repository') changedRecords.add(id);
     } else if (existing.contentHash === next.contentHash && existing.connectionId === next.connectionId && existing.resourceId === next.resourceId && existing.projectId === next.projectId) {
       id = existing.id;
       stats.records.unchanged++;
     } else {
       id = existing.id;
       await records.updateContent(conn, id, next);
+      if (e.recordType !== 'repository') changedRecords.add(id);
       if (existing.projectId !== next.projectId) await activities.syncProjectForRecord(conn, id, next.projectId);
       stats.records.updated++;
     }
@@ -177,6 +181,10 @@ export async function ingest(conn, { connector, connection, resource = null, env
       for (const t of transitions) pendingActivities.push({ ...t, recordRef: { recordType: e.recordType, externalId: e.externalId } });
     }
   }
+
+  // Phase 5: new or changed records (not repositories) are re-evaluated for relationship
+  // suggestions, in the same transaction so the job only exists if the data does.
+  for (const r of changedRecords) await queueEvaluation(conn, { type: 'external_record', id: r });
 
   // 3. Activities: once per dedupe key, attached to a known record.
   for (const e of [...parsed.filter((x) => x.type === 'activity'), ...pendingActivities]) {

@@ -81,3 +81,23 @@ export async function findBetween(conn, { from, to, linkType }) {
   );
   return rows[0] ? toLink(rows[0]) : null;
 }
+
+/** Any link between the two endpoints, whatever its type, direction or status. */
+export async function anyBetween(conn, a, b) {
+  const [rows] = await conn.query(
+    `SELECT id FROM record_links WHERE (from_type = ? AND from_id = ? AND to_type = ? AND to_id = ?)
+       OR (from_type = ? AND from_id = ? AND to_type = ? AND to_id = ?) LIMIT 1`,
+    [a.type, a.id, b.type, b.id, b.type, b.id, a.type, a.id],
+  );
+  return rows.length > 0;
+}
+
+/** Withdraws inferred suggestions touching an endpoint (e.g. its record was deleted at the source). */
+export async function withdrawSuggestions(conn, { type, id }) {
+  const [result] = await conn.execute(
+    `UPDATE record_links SET status = 'rejected', reviewed_at = NOW()
+     WHERE status = 'suggested' AND origin IN ('rule', 'ai') AND ((from_type = ? AND from_id = ?) OR (to_type = ? AND to_id = ?))`,
+    [type, id, type, id],
+  );
+  return result.affectedRows;
+}

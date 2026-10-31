@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { logger } from '../utils/logger.js';
 import { recordInternalActivities } from './activities/internal.js';
+import { scheduleForAudit } from './correlation/schedule.js';
 
 /**
  * Writes an audit entry on `conn` and throws on failure. Use inside a transaction when the
@@ -16,6 +17,8 @@ export async function recordAudit(conn, { actorUserId = null, action, entityType
   );
   try {
     await recordInternalActivities(conn, { auditId: result.insertId, action, entityId, actorUserId, before, after });
+    // Phase 5: tasks and meetings that changed are re-evaluated for relationship suggestions.
+    await scheduleForAudit(conn, { action, entityId });
   } catch (err) {
     // A failed statement doesn't abort the MySQL transaction; the change itself stands.
     logger.error('internal activity not recorded', { action, entityId, error: err.message });

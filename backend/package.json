@@ -15,6 +15,7 @@
     "seed": "node src/db/seeds/devUsers.js",
     "credentials:rotate": "node src/scripts/rotateCredentials.js",
     "activities:backfill": "node src/scripts/backfillActivities.js",
+    "correlation:queue": "node src/scripts/queueCorrelation.js",
     "test": "NODE_ENV=test MEETING_TIMEZONE=UTC node --test --test-concurrency=1 'test/**/*.test.js'"
   },
   "dependencies": {

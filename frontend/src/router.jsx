@@ -8,6 +8,7 @@ import { ActivityFeedPage } from './pages/ActivityFeed.jsx';
 import { IntegrationSetupPage } from './pages/IntegrationSetup.jsx';
 import { RecordDetailPage } from './pages/RecordDetail.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
+import { SuggestionsPage } from './pages/Suggestions.jsx';
 import { AdminDashboard } from './pages/admin/Dashboard.jsx';
 import { IntegrationDetailPage } from './pages/admin/IntegrationDetail.jsx';
 import { IntegrationsPage } from './pages/admin/Integrations.jsx';
@@ -77,6 +78,11 @@ export const router = createBrowserRouter([
           { path: '/activity', element: <ActivityFeedPage /> },
           { path: '/records/:id', element: <RecordDetailPage /> },
           { path: '/search', element: <SearchPage /> },
+          // Phase 5: relationship suggestions to review (the API returns only what the person may decide).
+          {
+            element: <ProtectedRoute roles={['admin', 'manager']} />,
+            children: [{ path: '/suggestions', element: <SuggestionsPage /> }],
+          },
         ],
       },
     ],

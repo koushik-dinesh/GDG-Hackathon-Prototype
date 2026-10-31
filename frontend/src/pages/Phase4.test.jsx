@@ -8,6 +8,7 @@ import { RelatedRecords } from '../components/RelatedRecords.jsx';
 import { ActivityFeedPage } from './ActivityFeed.jsx';
 import { RecordDetailPage } from './RecordDetail.jsx';
 import { SearchPage } from './SearchPage.jsx';
+import { SuggestionsPage } from './Suggestions.jsx';
 
 vi.mock('../api/workRecords.js');
 vi.mock('../api/projects.js', () => ({ listProjects: vi.fn(async () => ({ projects: [{ id: 3, name: 'Payments' }] })) }));
@@ -223,5 +224,36 @@ describe('Search', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }));
     expect(await screen.findByText('No results')).toBeTruthy();
     expect(screen.getByTestId('where').textContent).toBe('/search?q=nothing+here');
+  });
+});
+
+describe('Suggestions (Phase 5)', () => {
+  it('lists suggestions with both ends, reason and confidence, and confirms or rejects them', async () => {
+    const s = (id, o = {}) => ({
+      id,
+      linkType: 'tracks',
+      confidence: 0.72,
+      evidence: { matcher: 'wording-overlap', reason: 'Same project; both mention refund, partial' },
+      createdAt: '2026-10-30T10:00:00Z',
+      from: { type: 'action_item', id: 7, provider: 'workagent', recordType: 'task', title: 'Refund export', href: '/my/tasks/7' },
+      to: { type: 'external_record', id: 50, provider: 'github', recordType: 'issue', title: 'Refunds fail', key: 'acme/payments#12', url: 'https://github.com/acme/payments/issues/12', href: '/records/50' },
+      ...o,
+    });
+    api.listLinkSuggestions.mockResolvedValue({ suggestions: [s(1), s(2, { from: { ...s(1).from, title: 'Ledger fix' } })] });
+    api.reviewRecordLink.mockResolvedValue({ link: {} });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <SuggestionsPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findAllByText(/Similar wording · 72% confidence · Same project; both mention refund, partial/)).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Refunds fail' })[0].getAttribute('href')).toBe('/records/50');
+    await user.click(screen.getAllByRole('button', { name: 'Confirm' })[0]);
+    expect(api.reviewRecordLink).toHaveBeenCalledWith(1, 'confirmed');
+    expect(await screen.findByText('Relationship confirmed.')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+    expect(api.reviewRecordLink).toHaveBeenLastCalledWith(2, 'rejected');
+    expect(await screen.findByText('Nothing to review')).toBeTruthy();
   });
 });

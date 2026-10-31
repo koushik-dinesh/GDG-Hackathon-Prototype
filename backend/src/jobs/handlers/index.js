@@ -1,4 +1,5 @@
 import { aiExtract } from './aiExtract.js';
+import { correlationEvaluate } from './correlationEvaluate.js';
 import { emailSend } from './emailSend.js';
 import { integrationMaintenance } from './integrationMaintenance.js';
 import { integrationSync } from './integrationSync.js';
@@ -13,6 +14,7 @@ export const handlers = {
   'integration.sync': integrationSync,
   'integration.webhook': integrationWebhook,
   'integration.maintenance': integrationMaintenance,
+  'correlation.evaluate': correlationEvaluate,
 };
 
 /** The handlers this worker runs: all, or only those listed in WORKER_JOB_TYPES. */

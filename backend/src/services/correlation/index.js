@@ -1,15 +1,18 @@
-// Correlation boundary (prepared in Phase 4, used by Phase 5). Phase 5's matchers (record
-// matching, relationship suggestions, activity correlation, entity resolution) plug in here and
-// only ever SUGGEST: nothing inferred is confirmed without a person (services/records/relationships).
+// Correlation engine (boundary prepared in Phase 4, engine in Phase 5). Matchers (record matching,
+// relationship suggestions, activity correlation, entity resolution) only ever SUGGEST: nothing
+// inferred is confirmed without a person (services/records/relationships).
 //
-// Contract for a matcher (Phase 5):
-//   { id: 'issue-key-in-text', run: async (conn, record) => [{ to: { type, id }, linkType, confidence, evidence }] }
-// registered with registerMatcher(); runMatchers(conn, record) calls every matcher and stores the
-// results with suggestLink(). Phase 4 registers no matchers.
+// Contract for a matcher:
+//   { id, appliesTo: ['external_record'|'action_item'|'meeting', ...],
+//     run: async (conn, subject) => [{ from?, to: { type, id }, linkType, confidence, evidence }] }
+// `subject` comes from loadSubject() (title, body, project, people, dates). Built-in matchers live
+// in matchers.js; registerMatcher() adds more (e.g. Phase 6 AI). evaluate(conn, ref) runs them all
+// for one record, task or meeting (job correlation.evaluate, queued when records arrive or change).
 import { pool } from '../../db/pool.js';
 import * as identities from '../../repositories/externalIdentitiesRepository.js';
 import * as links from '../../repositories/recordLinksRepository.js';
 import { createLink } from '../integrations/links.js';
+import { BUILT_IN_MATCHERS } from './matchers.js';
 
 const matchers = [];
 
@@ -73,4 +76,52 @@ export async function projectContext(projectId, conn = pool) {
     memberUserIds: [...new Set([project.owner_user_id, ...members.map((m) => m.user_id)])],
     resources: resources.map((r) => ({ id: r.id, connectionId: r.connection_id, resourceType: r.resource_type, externalId: r.external_id, name: r.name })),
   };
+}
+
+/**
+ * Everything matchers need about one record, task or meeting, or null when it doesn't exist.
+ * { type, id, recordType, title, body, key, projectId, deleted, createdAt, authorIdentityId,
+ *   assigneeUserId, reviewStatus, scheduledAt, updatedAt }
+ */
+export async function loadSubject(conn, { type, id }) {
+  if (type === 'external_record') {
+    const [[r]] = await conn.query(
+      'SELECT id, record_type, title, body, external_key, project_id, source_deleted_at, source_created_at, source_updated_at, author_identity_id FROM external_records WHERE id = ?',
+      [id],
+    );
+    return r && { type, id: r.id, recordType: r.record_type, title: r.title, body: r.body, key: r.external_key, projectId: r.project_id, deleted: Boolean(r.source_deleted_at), createdAt: r.source_created_at, updatedAt: r.source_updated_at, authorIdentityId: r.author_identity_id };
+  }
+  if (type === 'action_item') {
+    const [[t]] = await conn.query('SELECT id, title, description, project_id, review_status, assignee_user_id, created_at FROM action_items WHERE id = ?', [id]);
+    return t && { type, id: t.id, recordType: 'task', title: t.title, body: t.description, key: null, projectId: t.project_id, deleted: false, createdAt: t.created_at, reviewStatus: t.review_status, assigneeUserId: t.assignee_user_id };
+  }
+  if (type === 'meeting') {
+    const [[m]] = await conn.query('SELECT id, title, project_id, scheduled_at, updated_at FROM meetings WHERE id = ?', [id]);
+    return m && { type, id: m.id, recordType: 'meeting', title: m.title, body: null, key: null, projectId: m.project_id, deleted: false, scheduledAt: m.scheduled_at, updatedAt: m.updated_at };
+  }
+  return null;
+}
+
+/**
+ * Runs every matcher that applies to this subject and stores new suggestions. Pairs that already
+ * have any relationship (confirmed, suggested or rejected by a person) are left alone. A record
+ * deleted at the source gets no new suggestions and its pending ones are withdrawn (kept as
+ * rejected, for history). Returns { suggested, withdrawn }.
+ */
+export async function evaluate(conn, ref) {
+  const subject = await loadSubject(conn, ref);
+  if (!subject) return { suggested: 0, withdrawn: 0 };
+  if (subject.deleted) return { suggested: 0, withdrawn: await links.withdrawSuggestions(conn, ref) };
+  let suggested = 0;
+  for (const m of [...BUILT_IN_MATCHERS, ...matchers]) {
+    if (m.appliesTo && !m.appliesTo.includes(subject.type)) continue;
+    for (const p of await m.run(conn, subject)) {
+      const from = p.from ?? { type: subject.type, id: subject.id };
+      if (from.type === p.to.type && from.id === p.to.id) continue;
+      if (await links.anyBetween(conn, from, p.to)) continue;
+      const stored = await suggestLink(conn, { from, to: p.to, linkType: p.linkType, confidence: p.confidence, method: p.method ?? 'rule', evidence: { matcher: m.id, ...(p.evidence ?? {}) } });
+      if (stored) suggested++;
+    }
+  }
+  return { suggested, withdrawn: 0 };
 }

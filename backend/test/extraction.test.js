@@ -8,7 +8,7 @@ import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { pool } from '../src/db/pool.js';
 import { aiExtract } from '../src/jobs/handlers/aiExtract.js';
-import { handlers } from '../src/jobs/handlers/index.js';
+import { handlersFor } from '../src/jobs/handlers/index.js';
 import * as queue from '../src/jobs/queue.js';
 import { processNext, recover } from '../src/jobs/runner.js';
 import { claude, classifyError } from '../src/services/ai/claudeClient.js';
@@ -85,6 +85,8 @@ async function meetingWithTranscript({ content = ENGLISH, filename, scheduledAt 
 }
 
 const extract = (id) => admin().post(`/api/v1/meetings/${id}/extract`);
+// These tests exercise the extraction worker; other job types (e.g. correlation) are not its concern.
+const handlers = handlersFor(['ai.extract']);
 const work = () => processNext('test-worker', handlers);
 const meetingRow = async (id) => (await pool.query('SELECT status, last_error FROM meetings WHERE id = ?', [id]))[0][0];
 const runsFor = async (id) => (await pool.query('SELECT * FROM extraction_runs WHERE meeting_id = ? ORDER BY id', [id]))[0];
@@ -399,7 +401,7 @@ describe('worker interruption', () => {
   it('recovers a job whose worker died mid-extraction and completes it', async () => {
     const id = await meetingWithTranscript();
     await extract(id);
-    const claimed = await queue.claimNext('crashed-worker');
+    const claimed = await queue.claimNext('crashed-worker', ['ai.extract']);
     assert.equal(claimed.payload.meetingId, id);
     await pool.query('UPDATE jobs SET locked_at = DATE_SUB(NOW(), INTERVAL 10 MINUTE) WHERE id = ?', [claimed.id]);
 

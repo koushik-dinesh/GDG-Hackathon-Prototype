@@ -1,5 +1,10 @@
 # WorkAgent — Next Steps (2026-10-31)
 
+> **Phase 5 (correlation) is complete. Next: the intelligence and insights engine.**
+> - Deterministic, evidence-backed insights from tasks, meetings, records, activities and links: project health, overdue work, meeting follow-through, blockers, PR review progress, workload, stalled work, trends.
+> - Every insight distinguishes facts (counts, dates) from inferences (risk), links to its evidence, honours role visibility, and supports time and project filters with drill-down.
+> - Replace the placeholder admin dashboard with it.
+
 > **Phase 4 is complete. Next: Phase 5, cross-application correlation.**
 > - Register matchers in `services/correlation/` and run them on ingest and for new internal records. Matchers produce suggestions only, with confidence and evidence:
 >   - key references in text (`acme/api#12`, `PAY-42`);
