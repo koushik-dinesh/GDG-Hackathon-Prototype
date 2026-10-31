@@ -74,7 +74,7 @@ describe('access control', () => {
   it('lists providers with availability and no configuration values', async () => {
     const res = await as('admin').get('/api/v1/integrations/providers');
     assert.equal(res.status, 200);
-    assert.deepEqual(res.body.providers.map((p) => [p.id, p.available]), [['github', false], ['jira', false], ['fake', true]], 'real providers are listed but not configured in tests');
+    assert.deepEqual(res.body.providers.map((p) => [p.id, p.available]), [['github', false], ['jira', false], ['microsoft_teams', false], ['outlook', false], ['fake', true]], 'real providers are listed but not configured in tests');
     assert.equal(res.body.providers[0].problem, 'GITHUB_APP_ID is not set');
   });
 });

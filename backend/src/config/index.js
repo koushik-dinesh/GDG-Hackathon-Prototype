@@ -144,6 +144,13 @@ const schema = z.object({
   JIRA_AUTH_URL: z.string().url().default('https://auth.atlassian.com'),
   JIRA_API_URL: z.string().url().default('https://api.atlassian.com'),
 
+  // Microsoft 365 (Teams and Outlook through Microsoft Graph): one single-tenant Entra app.
+  MS_CLIENT_ID: z.string().uuid('The Application (client) ID from Entra').optional(),
+  MS_CLIENT_SECRET: z.string().min(10).optional(),
+  MS_TENANT_ID: z.string().uuid('The Directory (tenant) ID from Entra').optional(),
+  MS_LOGIN_URL: z.string().url().default('https://login.microsoftonline.com'),
+  MS_GRAPH_URL: z.string().url().default('https://graph.microsoft.com'),
+
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
   JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
@@ -328,6 +335,16 @@ export const config = {
         webhookSecret: env.JIRA_WEBHOOK_SECRET,
         authUrl: env.JIRA_AUTH_URL.replace(/\/+$/, ''),
         apiUrl: env.JIRA_API_URL.replace(/\/+$/, ''),
+      },
+  // Microsoft Graph (Teams, Outlook). Tests configure a fake Graph explicitly.
+  microsoft: isTest
+    ? { clientId: undefined, clientSecret: undefined, tenantId: undefined, loginUrl: env.MS_LOGIN_URL, graphUrl: env.MS_GRAPH_URL }
+    : {
+        clientId: env.MS_CLIENT_ID,
+        clientSecret: env.MS_CLIENT_SECRET,
+        tenantId: env.MS_TENANT_ID,
+        loginUrl: env.MS_LOGIN_URL.replace(/\/+$/, ''),
+        graphUrl: env.MS_GRAPH_URL.replace(/\/+$/, ''),
       },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,

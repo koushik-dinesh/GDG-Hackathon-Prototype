@@ -303,3 +303,39 @@ Run this against a real App and a test repository. Live verification has **not**
 3. Edit an issue in Jira; with webhooks on it appears within seconds (Webhook deliveries list: processed), otherwise at the next sync.
 4. Revoke the app at id.atlassian.com; the next sync marks the connection *needs reconnect*.
 5. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.
+
+## 12. Microsoft Teams and Outlook (Microsoft Graph)
+
+**Status:** implemented and tested against a local fake of Microsoft identity and Graph (`backend/test/microsoft.test.js`, 25 tests incl. both contract suites and API → sync engine end to end). **Not verified against a live Microsoft 365 tenant.** **Change notifications (Graph subscriptions) are not implemented:** both connectors poll with delta queries on the sync interval (`INTEGRATION_SYNC_INTERVAL_MIN`).
+
+### 12.1 Register the app (once, by an Entra administrator)
+
+1. entra.microsoft.com → App registrations → New registration: "WorkAgent", **single tenant**.
+2. Redirect URIs (platform *Web*): `<APP_PUBLIC_URL>/integrations/microsoft_teams/setup` and `<APP_PUBLIC_URL>/integrations/outlook/setup`.
+3. Certificates & secrets → New client secret; note its expiry and put a renewal reminder in the calendar.
+4. API permissions → Microsoft Graph → **Delegated**: `User.Read`, `offline_access`, and
+   - Teams: `Team.ReadBasic.All`, `Channel.ReadBasic.All`, `ChannelMessage.Read.All` (needs **admin consent**);
+   - Outlook: `Mail.Read`, `Calendars.Read`.
+   Then **Grant admin consent** for the tenant.
+5. `backend/.env`: `MS_CLIENT_ID` (Application ID), `MS_CLIENT_SECRET`, `MS_TENANT_ID` (Directory ID). Restart API and worker.
+
+### 12.2 What each connection is
+
+- A connection is **one Microsoft account** of the tenant (whoever signs in on Connect). Teams sees the channels of the teams that account belongs to; Outlook sees that account's mail folders and calendars. Use a dedicated service account if the data should not depend on one person.
+- WorkAgent refuses grants missing the permissions above (e.g. no admin consent) and grants without offline access.
+- **Teams:** resources are channels (`Team / Channel`). Records: channel posts and their replies (`message`), edits and deletions. Mentions like `PAY-42` or `acme/api#12` produce relationship suggestions.
+- **Outlook:** resources are mail folders and calendars. Mail records keep subject, sender, recipients and Graph's ~255-character **preview only** — never full bodies or attachments. Calendar events keep subject, start/end, organizer, attendees, the Teams join link and status (scheduled / done / cancelled). Senders and organizers are people identified by e-mail address and matched to WorkAgent users with the same e-mail automatically.
+- Deletions (Graph `@removed`) mark records deleted and keep what was stored. An expired delta token (Graph forgets them after ~7 days without sync) restarts from the backfill window. HTTP 429/503 with `Retry-After` pauses the connection.
+
+### 12.3 Revocation and disconnecting
+
+- Tokens: access ~1 h, refreshed automatically; refresh tokens are replaced on each refresh. A revoked grant or expired client secret turns the connection to **needs reconnect**.
+- Disconnect deletes the stored tokens. To revoke at Microsoft: Entra → Enterprise applications → WorkAgent → Permissions/Users, or the user at myaccount.microsoft.com → Apps.
+
+### 12.4 Live verification checklist
+
+1. Connect Teams with the service account; check channels are listed. Enable one channel, map it, Sync now; compare messages with the channel.
+2. Delete a message in Teams; after the next sync the record shows *deleted* with its text kept.
+3. Connect Outlook; enable Inbox and Calendar; check mail previews and events (with join links).
+4. Remove admin consent in Entra; the next sync marks the connection *needs reconnect*.
+5. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.

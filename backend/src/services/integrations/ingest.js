@@ -132,6 +132,27 @@ export async function ingest(conn, { connector, connection, resource = null, env
       recordCache.set(`${e.recordType}:${e.externalId}`, existing);
       continue;
     }
+    // A tombstone (deleted, no content: e.g. a Graph "@removed" item) only marks a known record
+    // deleted and keeps what was stored; an unknown one has nothing to delete.
+    if (e.deleted && !e.title && !e.body.text) {
+      if (!existing) {
+        stats.records.unchanged++;
+        continue;
+      }
+      Object.assign(e, {
+        externalKey: existing.externalKey,
+        url: existing.url,
+        title: existing.title,
+        body: { text: existing.body, truncated: false },
+        state: existing.state,
+        statusCategory: existing.statusCategory,
+        metadata: existing.metadata,
+        sourceCreatedAt: existing.sourceCreatedAt,
+        sourceUpdatedAt: e.sourceUpdatedAt ?? existing.sourceUpdatedAt,
+        tombstoneAuthorId: existing.authorIdentityId,
+        tombstoneParentId: existing.parentRecordId,
+      });
+    }
     const parent = e.parentRef ? await recordFor(e.parentRef) : null;
     const projectId = existing?.projectLocked ? existing.projectId : resource ? resource.projectId : existing?.projectId ?? null;
     const next = {
@@ -139,13 +160,13 @@ export async function ingest(conn, { connector, connection, resource = null, env
       externalKey: e.externalKey,
       connectionId: connection.id,
       resourceId: resource?.id ?? existing?.resourceId ?? null,
-      parentRecordId: parent?.id ?? null,
+      parentRecordId: parent?.id ?? e.tombstoneParentId ?? null,
       url: e.url ?? null,
       title: e.title,
       body: e.body.text,
       state: e.state,
       statusCategory: e.statusCategory,
-      authorIdentityId: await identityId(e.authorRef),
+      authorIdentityId: e.tombstoneAuthorId ?? (await identityId(e.authorRef)),
       projectId,
       metadata: e.body.truncated ? { ...(e.metadata ?? {}), truncated: true } : e.metadata ?? null,
       sourceCreatedAt: e.sourceCreatedAt ?? existing?.sourceCreatedAt ?? null,
