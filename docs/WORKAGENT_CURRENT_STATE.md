@@ -1,5 +1,11 @@
 # WorkAgent — Current State (assessment of 2026-10-30)
 
+> **Update: Microsoft Teams, Outlook, Google Meet and Figma connectors implemented (2026-10-31). None live-verified** (no provider credentials available).
+> - Teams/Outlook (Microsoft Graph, one Entra app, delegated OAuth, delta sync, deletions as tombstones; no change notifications), Google Meet (Workspace OAuth, Meet events by sync token, conference records; no push), Figma (OAuth, files/comments/versions, deleted-file detection, passcode webhooks treated as nudges).
+> - Tests against local fakes: Teams+Outlook 25, Google Meet 14, Figma 15 (each with the shared contract suite and an API → sync engine end-to-end test). Backend 573/573.
+> - Browser-verified against dev instances of the fakes: Connect → provider consent stand-in → setup page → connected (tenant/scopes shown) for all four; resources enabled and synced by the worker; their items appear in Activity with the right badges and summaries. The check found and fixed a too-strict GUID validation for `MS_CLIENT_ID`/`MS_TENANT_ID`.
+> - Setup and live-verification steps: `docs/runbooks/integrations.md` §12–14.
+
 > **Update: Jira Cloud connector implemented (2026-10-31). Not live-verified** (no Atlassian credentials available).
 > - OAuth 2.0 (3LO) connect with site check and offline access, rotating refresh tokens in the vault, JQL sync (open issues of any age + `updated` incremental in the API user's time zone, page tokens, extra comments), issue links (blocks/duplicates/related/sub-tasks), people, signed webhooks (`X-Hub-Signature`, deduplicated by `X-Atlassian-Webhook-Identifier`), deletions kept as deleted, revoked grants → needs reconnect.
 > - Shared OAuth helper (`providers/oauth2.js`), `form` bodies in the HTTP client, `ctx.credentials.peek()`; integration callback accepts parameters up to 4,096 characters.

@@ -21,6 +21,9 @@ const encryptionKey = z
   .refine((v) => !v || /^[A-Za-z0-9+/_-]+={0,2}$/.test(v), 'Must be base64 (generate with: openssl rand -base64 32)')
   .refine((v) => !v || Buffer.from(v, 'base64').length === 32, 'Must decode to exactly 32 bytes (openssl rand -base64 32)');
 
+// Entra ids are GUIDs; not every GUID carries RFC 4122 version bits, so no strict uuid() check.
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -145,9 +148,9 @@ const schema = z.object({
   JIRA_API_URL: z.string().url().default('https://api.atlassian.com'),
 
   // Microsoft 365 (Teams and Outlook through Microsoft Graph): one single-tenant Entra app.
-  MS_CLIENT_ID: z.string().uuid('The Application (client) ID from Entra').optional(),
+  MS_CLIENT_ID: z.string().regex(GUID, 'The Application (client) ID from Entra (a GUID)').optional(),
   MS_CLIENT_SECRET: z.string().min(10).optional(),
-  MS_TENANT_ID: z.string().uuid('The Directory (tenant) ID from Entra').optional(),
+  MS_TENANT_ID: z.string().regex(GUID, 'The Directory (tenant) ID from Entra (a GUID)').optional(),
   MS_LOGIN_URL: z.string().url().default('https://login.microsoftonline.com'),
   MS_GRAPH_URL: z.string().url().default('https://graph.microsoft.com'),
 

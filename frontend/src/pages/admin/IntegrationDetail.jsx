@@ -153,7 +153,7 @@ export function IntegrationDetailPage() {
 
       <Card title="Recent webhook deliveries">
         {recentDeliveries.length === 0 ? (
-          <p className="text-sm text-slate-500">No webhooks received yet.</p>
+          <p className="text-sm text-slate-500">{SCHEDULED_ONLY.has(c.provider) ? 'This application is synced on a schedule; it does not send webhooks to WorkAgent.' : 'No webhooks received yet.'}</p>
         ) : (
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-500">
@@ -240,6 +240,9 @@ function GithubInstallation({ connection: c }) {
     </div>
   );
 }
+
+// Connectors that poll only (their change notifications are not implemented; runbook §12–13).
+const SCHEDULED_ONLY = new Set(['microsoft_teams', 'outlook', 'google_meet']);
 
 // Where an admin revokes WorkAgent's access at each OAuth provider (disconnecting deletes the tokens here).
 const REVOKE_AT = {
