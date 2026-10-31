@@ -371,3 +371,42 @@ Run this against a real App and a test repository. Live verification has **not**
 3. Cancel a Meet event; after the next sync it shows *deleted*.
 4. Connect with a personal Gmail account: refused with the domain message.
 5. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.
+
+## 14. Figma
+
+**Status:** implemented and tested against a local fake of Figma OAuth and REST v1 (`backend/test/figma.test.js`, 15 tests incl. the contract suite in passcode mode and end to end). **Not verified against live Figma.** Scope names follow Figma's granular OAuth scopes; confirm them in the app settings when creating the app.
+
+### 14.1 Create the OAuth app
+
+1. figma.com/developers → My apps → Create a new app. Callback URL: `<APP_PUBLIC_URL>/integrations/figma/setup`.
+2. Scopes: `current_user:read`, `file_content:read`, `file_metadata:read`, `file_comments:read`, `file_versions:read`, `projects:read`.
+3. `backend/.env`: `FIGMA_CLIENT_ID`, `FIGMA_CLIENT_SECRET`, `FIGMA_TEAM_ID` (the number in `figma.com/files/team/<id>/…`). Restart API and worker.
+
+### 14.2 What is synced
+
+- One Figma team per deployment; the person who connects must be able to read it (otherwise the connection is refused). Resources: the team's projects.
+- Per project: design files (name, last modified, thumbnail, link), their comments (open / resolved) and versions (named versions also appear in the activity feed; autosaves are stored but not announced). Only files modified since the last run are re-read. File contents (the design itself) are never downloaded.
+- Files that disappear from a project and are gone at Figma are marked deleted (stored data kept); moved files are left alone.
+- Comments mentioning `PAY-42` or `acme/api#12` produce relationship suggestions.
+
+### 14.3 Webhooks (optional)
+
+- Figma does not sign webhooks; it includes the passcode you chose in each payload. WorkAgent compares it in constant time and then treats the webhook only as a nudge: it takes the file key and re-reads the file, comments and versions (or confirms the deletion) from the API, so a forged or modified payload cannot inject content.
+- Register (team admin, with a personal access token that has `webhooks:write`):
+  ```bash
+  curl -X POST https://api.figma.com/v2/webhooks -H "X-Figma-Token: <token>" -H "Content-Type: application/json" \
+    -d '{"event_type":"FILE_UPDATE","team_id":"<FIGMA_TEAM_ID>","endpoint":"<PUBLIC_WEBHOOK_BASE_URL>/api/v1/webhooks/figma","passcode":"<FIGMA_WEBHOOK_PASSCODE>"}'
+  ```
+  Repeat for `FILE_COMMENT`, `FILE_VERSION_UPDATE` and `FILE_DELETE`.
+
+### 14.4 Tokens and disconnecting
+
+- Access tokens are refreshed with the refresh token (Figma does not rotate it); Figma's 403 "Invalid token" triggers one refresh and retry. A revoked app turns the connection to *needs reconnect*.
+- Figma has no revocation API: disconnect deletes the stored tokens; remove the app under Figma → Settings → Security → Connected apps.
+
+### 14.5 Live verification checklist
+
+1. Connect; projects of the team are listed. Enable one and map it; Sync now; compare files, comments and named versions.
+2. Comment in a file; with webhooks the comment appears within seconds, otherwise at the next sync.
+3. Delete a file; it shows *deleted* after the webhook or next sync.
+4. Record the result in `docs/WORKAGENT_CURRENT_STATE.md`.

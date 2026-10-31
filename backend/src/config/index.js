@@ -161,6 +161,16 @@ const schema = z.object({
   GOOGLE_CALENDAR_API_URL: z.string().url().default('https://www.googleapis.com'),
   GOOGLE_MEET_API_URL: z.string().url().default('https://meet.googleapis.com'),
 
+  // Figma (OAuth app from figma.com/developers). Unset FIGMA_CLIENT_ID = unavailable.
+  FIGMA_CLIENT_ID: z.string().min(10).optional(),
+  FIGMA_CLIENT_SECRET: z.string().min(10).optional(),
+  // The Figma team whose projects are synced (the number in figma.com/files/team/<id>/…).
+  FIGMA_TEAM_ID: z.string().regex(/^\d{1,30}$/, 'The numeric Figma team id').optional(),
+  // Passcode given when registering Figma webhooks; empty = Figma is polled only.
+  FIGMA_WEBHOOK_PASSCODE: z.string().min(20, 'Use a long random passcode (openssl rand -hex 32)').optional(),
+  FIGMA_AUTH_URL: z.string().url().default('https://www.figma.com'),
+  FIGMA_API_URL: z.string().url().default('https://api.figma.com'),
+
   // Background worker / job queue
   WORKER_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(2000),
   JOB_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
@@ -367,6 +377,17 @@ export const config = {
         tokenUrl: env.GOOGLE_TOKEN_URL,
         calendarUrl: env.GOOGLE_CALENDAR_API_URL.replace(/\/+$/, ''),
         meetUrl: env.GOOGLE_MEET_API_URL.replace(/\/+$/, ''),
+      },
+  // Figma. Tests configure a fake Figma explicitly.
+  figma: isTest
+    ? { clientId: undefined, clientSecret: undefined, teamId: undefined, webhookPasscode: undefined, authUrl: env.FIGMA_AUTH_URL, apiUrl: env.FIGMA_API_URL }
+    : {
+        clientId: env.FIGMA_CLIENT_ID,
+        clientSecret: env.FIGMA_CLIENT_SECRET,
+        teamId: env.FIGMA_TEAM_ID,
+        webhookPasscode: env.FIGMA_WEBHOOK_PASSCODE,
+        authUrl: env.FIGMA_AUTH_URL.replace(/\/+$/, ''),
+        apiUrl: env.FIGMA_API_URL.replace(/\/+$/, ''),
       },
   jobs: {
     pollIntervalMs: env.WORKER_POLL_INTERVAL_MS,

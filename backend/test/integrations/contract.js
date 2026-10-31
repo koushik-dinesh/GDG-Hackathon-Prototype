@@ -13,6 +13,7 @@ import { ProviderError } from '../../src/services/integrations/errors.js';
  *   makeCtx(connection, resource?)      ctx with http/credentials/logger for this connector
  *   validWebhook()                      -> { headers, rawBody }  (correctly signed)
  *   maxChunks?                          upper bound for a full sync of the first resource
+ *   passcodeOnly?                       webhooks carry a passcode, not a signature (see the webhook test)
  * }
  */
 export function describeConnector(connector, fixtures) {
@@ -87,6 +88,16 @@ export function describeConnector(connector, fixtures) {
       it('verifies webhook signatures and rejects tampering', () => {
         const { headers, rawBody } = fixtures.validWebhook();
         assert.equal(connector.verifyWebhook({ headers, rawBody }), true);
+        if (fixtures.passcodeOnly) {
+          // Providers that authenticate with a shared passcode in the body (Figma) cannot detect a
+          // modified payload; such connectors must treat a webhook as a nudge and re-read from the
+          // API. Here: a wrong or missing passcode is refused.
+          const body = JSON.parse(rawBody.toString('utf8'));
+          assert.equal(connector.verifyWebhook({ headers, rawBody: Buffer.from(JSON.stringify({ ...body, passcode: 'x'.repeat(String(body.passcode).length) })) }), false);
+          const { passcode, ...without } = body;
+          assert.equal(connector.verifyWebhook({ headers, rawBody: Buffer.from(JSON.stringify(without)) }), false);
+          return;
+        }
         const tampered = Buffer.concat([rawBody, Buffer.from(' ')]);
         assert.equal(connector.verifyWebhook({ headers, rawBody: tampered }), false);
         const unsigned = Object.fromEntries(Object.entries(headers).filter(([k]) => !/signature/i.test(k)));
